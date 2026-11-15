@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIMPRO KONSTRUKSI — Enterprise Construction ERP</title>
-  <script src="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/lib/index.min.js"></script>
+  <title>SIMPRO KONSTRUKSI — Portal Layanan & Manajemen Proyek</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -12,437 +11,551 @@
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; }
     .tab-active { background-color: #0f172a; color: #38bdf8; border-right: 4px solid #38bdf8; }
-    .mobile-tab-active { color: #38bdf8 !important; }
-    .gantt-bar { transition: all 0.3s ease; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .admin-only { display: none; }
+    body.is-admin .admin-only { display: block; }
+    body.is-admin .admin-flex { display: flex !important; }
+    body.is-admin .admin-inline { display: inline-flex !important; }
+    body.is-admin .admin-cell { display: table-cell !important; }
+
+    /* Pengaturan Cetak / Export PDF */
+    @media print {
+      body * { visibility: hidden; }
+      #printableArea, #printableArea * { visibility: visible; }
+      #printableArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        padding: 20px;
+      }
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body class="text-slate-800 antialiased">
 
   <!-- Top Navbar -->
-  <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+  <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md no-print">
     <div class="max-w-full mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="bg-sky-500 text-slate-900 p-2 rounded-lg font-bold">
           <i class="fa-solid fa-helmet-safety text-xl"></i>
         </div>
         <div>
-          <h1 class="font-bold text-lg tracking-tight leading-none">SIMPRO <span class="text-sky-400">KONSTRUKSI</span></h1>
-          <p class="text-[11px] text-slate-400" id="headerProjectName">Pembangunan Gedung Perkantoran 5 Lantai</p>
+          <h1 class="font-bold text-base sm:text-lg tracking-tight leading-none" id="brandCompanyName">PT. KARYA KONSTRUKSI NUSANTARA</h1>
+          <p class="text-[11px] text-slate-400 mt-0.5" id="brandCompanyAddress">Jl. Kaliurang Km 5.5, Sleman, DI Yogyakarta</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-3">
-        <span id="connectionBadge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
-          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Mode Simulasi (Offline)
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Indikator Mode -->
+        <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+          <i class="fa-solid fa-eye text-sky-400"></i> Mode Pengunjung
         </span>
-        <button onclick="openApiModal()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-lg transition flex items-center gap-2">
-          <i class="fa-solid fa-plug"></i> <span class="hidden sm:inline">Koneksi Spreadsheet</span>
+
+        <!-- Tombol Koneksi API (Khusus Admin) -->
+        <button onclick="openApiModal()" class="admin-inline hidden bg-slate-800 hover:bg-slate-700 text-sky-400 font-semibold text-xs px-3 py-2 rounded-lg transition items-center gap-1.5 border border-slate-700">
+          <i class="fa-solid fa-plug"></i> <span class="hidden md:inline">API Sheets</span>
         </button>
-        <button onclick="fetchAllData()" title="Refresh Data" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg transition">
-          <i class="fa-solid fa-rotate" id="refreshIcon"></i>
+
+        <!-- Tombol Login / Logout Admin -->
+        <button id="btnLoginToggle" onclick="handleAuthClick()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition flex items-center gap-2 shadow">
+          <i class="fa-solid fa-lock"></i> <span>Login Admin</span>
         </button>
       </div>
     </div>
   </header>
 
   <div class="flex min-h-[calc(100vh-4rem)]">
-    <!-- Sidebar Navigation (Desktop) -->
-    <aside class="w-64 bg-slate-900 text-slate-300 flex-shrink-0 hidden md:flex flex-col justify-between border-r border-slate-800">
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex-shrink-0 hidden md:flex flex-col justify-between border-r border-slate-800 no-print">
       <nav class="py-4 space-y-1">
-        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn tab-active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-chart-pie w-5"></i> Dashboard Eksekutif
+        <div class="px-6 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Portal Publik & Proyek</div>
+        <button onclick="switchTab('services')" id="nav-services" class="nav-btn tab-active w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+          <i class="fa-solid fa-store w-5"></i> Layanan & Pemesanan
+        </button>
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+          <i class="fa-solid fa-chart-pie w-5"></i> Dashboard Proyek
         </button>
         <button onclick="switchTab('planning')" id="nav-planning" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-diagram-project w-5"></i> WBS, Gantt & Kurva-S
+          <i class="fa-solid fa-diagram-project w-5"></i> WBS & Jadwal Kerja
         </button>
         <button onclick="switchTab('cost')" id="nav-cost" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-calculator w-5"></i> RAB, AHSP & EVM Cost
+          <i class="fa-solid fa-calculator w-5"></i> RAB & Analisa AHSP
         </button>
-        <button onclick="switchTab('field')" id="nav-field" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-clipboard-check w-5"></i> Laporan Lapangan & CCO
-        </button>
-        <button onclick="switchTab('resources')" id="nav-resources" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-truck-pickup w-5"></i> Alat Berat & Material
-        </button>
-        <button onclick="switchTab('documents')" id="nav-documents" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-folder-open w-5"></i> Dokumen & Revisi Gambar
-        </button>
-        <button onclick="switchTab('qchse')" id="nav-qchse" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
-          <i class="fa-solid fa-shield-halved w-5"></i> Quality Control & K3
-        </button>
+
+        <!-- Menu Khusus Admin -->
+        <div class="admin-only pt-4">
+          <div class="px-6 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-400">Administrasi & Keuangan</div>
+          <button onclick="switchTab('orders')" id="nav-orders" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+            <i class="fa-solid fa-cart-check w-5 text-amber-400"></i> Konfirmasi Pesanan
+          </button>
+          <button onclick="switchTab('cashflow')" id="nav-cashflow" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+            <i class="fa-solid fa-wallet w-5 text-emerald-400"></i> Arus Kas & Laporan PDF
+          </button>
+          <button onclick="switchTab('field')" id="nav-field" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+            <i class="fa-solid fa-clipboard-check w-5 text-sky-400"></i> Laporan Harian Lapangan
+          </button>
+          <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn w-full flex items-center gap-3 px-6 py-3 text-sm font-medium hover:bg-slate-800/60 transition text-left">
+            <i class="fa-solid fa-gear w-5 text-slate-400"></i> Pengaturan Perusahaan
+          </button>
+        </div>
       </nav>
-      <div class="p-4 border-t border-slate-800 text-xs text-slate-500">
-        <p class="font-semibold text-slate-400">Kontrak Aktif: PRJ-001</p>
-        <p>Klien: PT. Maju Bersama</p>
+
+      <div class="p-4 border-t border-slate-800 text-xs text-slate-400">
+        <p class="font-semibold text-white mb-1">Kontak WhatsApp Admin:</p>
+        <a id="sidebarWaLink" href="#" target="_blank" class="text-emerald-400 hover:underline flex items-center gap-1.5">
+          <i class="fa-brands fa-whatsapp text-base"></i> <span id="sidebarWaText">+62 812-3456-7890</span>
+        </a>
       </div>
     </aside>
 
     <!-- Mobile Navigation Bar -->
-    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-slate-300 flex justify-around py-2.5 z-40 border-t border-slate-800 text-xs">
-      <button onclick="switchTab('dashboard')" id="mob-dashboard" class="mob-btn flex flex-col items-center p-1 text-sky-400"><i class="fa-solid fa-chart-pie text-base"></i><span>Dash</span></button>
-      <button onclick="switchTab('planning')" id="mob-planning" class="mob-btn flex flex-col items-center p-1 text-slate-400"><i class="fa-solid fa-diagram-project text-base"></i><span>WBS</span></button>
-      <button onclick="switchTab('cost')" id="mob-cost" class="mob-btn flex flex-col items-center p-1 text-slate-400"><i class="fa-solid fa-calculator text-base"></i><span>RAB</span></button>
-      <button onclick="switchTab('field')" id="mob-field" class="mob-btn flex flex-col items-center p-1 text-slate-400"><i class="fa-solid fa-clipboard-check text-base"></i><span>Harian</span></button>
-      <button onclick="switchTab('qchse')" id="mob-qchse" class="mob-btn flex flex-col items-center p-1 text-slate-400"><i class="fa-solid fa-shield-halved text-base"></i><span>QC/K3</span></button>
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-slate-300 flex justify-around py-2.5 z-40 border-t border-slate-800 text-[11px] no-print">
+      <button onclick="switchTab('services')" class="flex flex-col items-center p-1"><i class="fa-solid fa-store text-base"></i><span>Layanan</span></button>
+      <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1"><i class="fa-solid fa-chart-pie text-base"></i><span>Proyek</span></button>
+      <button onclick="switchTab('orders')" class="admin-only flex flex-col items-center p-1 text-amber-400"><i class="fa-solid fa-cart-check text-base"></i><span>Pesanan</span></button>
+      <button onclick="switchTab('cashflow')" class="admin-only flex flex-col items-center p-1 text-emerald-400"><i class="fa-solid fa-wallet text-base"></i><span>Kas/PDF</span></button>
+      <button onclick="switchTab('settings')" class="admin-only flex flex-col items-center p-1"><i class="fa-solid fa-gear text-base"></i><span>Profil</span></button>
     </div>
 
     <!-- Main Content Area -->
     <main class="flex-1 p-4 sm:p-6 pb-20 md:pb-8 overflow-y-auto">
 
-      <!-- 1. DASHBOARD EKSEKUTIF -->
-      <section id="tab-dashboard" class="tab-content space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <!-- 1. KATALOG LAYANAN & PEMESANAN (TAMPILAN AWAL PUBLIK) -->
+      <section id="tab-services" class="tab-content space-y-6">
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 class="text-2xl font-bold text-slate-900">Dashboard Eksekutif Proyek</h2>
-            <p class="text-sm text-slate-500">Ringkasan kesehatan jadwal, biaya (EVM), dan keselamatan kerja secara real-time.</p>
+            <span class="bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold px-3 py-1 rounded-full">Layanan Konstruksi & Renovasi</span>
+            <h2 class="text-2xl font-bold mt-2">Pilih Paket Pekerjaan & Estimasi Biaya</h2>
+            <p class="text-sm text-slate-300 mt-1">Pesan langsung melalui WhatsApp resmi kami atau pantau progres proyek secara transparan.</p>
           </div>
-          <span class="text-xs font-semibold px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg self-start">
-            Status: ON-TRACK (Jalur Kritis Terkendali)
-          </span>
+          <button onclick="openServiceModal()" class="admin-inline hidden bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-4 py-3 rounded-xl items-center gap-2 self-start md:self-center shadow">
+            <i class="fa-solid fa-plus"></i> Tambah Layanan Baru
+          </button>
         </div>
 
-        <!-- KPI Cards -->
+        <!-- Grid Katalog Layanan -->
+        <div id="servicesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+      </section>
+
+      <!-- 2. DASHBOARD PROYEK -->
+      <section id="tab-dashboard" class="tab-content hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Dashboard Monitoring Proyek</h2>
+          <p class="text-sm text-slate-500">Ringkasan progres fisik, Kurva-S, dan indikator performa proyek.</p>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-xs font-semibold text-slate-400 uppercase">Progres Fisik Aktual</p>
-                <h3 class="text-2xl font-bold text-slate-900 mt-1" id="kpiProgress">0%</h3>
-              </div>
-              <span class="p-2.5 bg-sky-100 text-sky-600 rounded-lg"><i class="fa-solid fa-bars-progress"></i></span>
-            </div>
-            <p class="text-xs text-slate-500 mt-3" id="kpiPlanProgress">Rencana Kumulatif: 65.0%</p>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Progres Fisik Aktual</p>
+            <h3 class="text-2xl font-bold text-slate-900 mt-1" id="kpiProgress">0%</h3>
+            <p class="text-xs text-slate-500 mt-2">Rencana Kumulatif: 62.0%</p>
           </div>
-
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-xs font-semibold text-slate-400 uppercase">Cost Performance (CPI)</p>
-                <h3 class="text-2xl font-bold text-emerald-600 mt-1" id="kpiCPI">1.00</h3>
-              </div>
-              <span class="p-2.5 bg-emerald-100 text-emerald-600 rounded-lg"><i class="fa-solid fa-sack-dollar"></i></span>
-            </div>
-            <p class="text-xs text-slate-500 mt-3" id="kpiCostStatus">Efisiensi Biaya Terkendali (CPI ≥ 1)</p>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Cost Performance (CPI)</p>
+            <h3 class="text-2xl font-bold text-emerald-600 mt-1" id="kpiCPI">1.00</h3>
+            <p class="text-xs text-slate-500 mt-2">Efisiensi Biaya Proyek</p>
           </div>
-
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-xs font-semibold text-slate-400 uppercase">Schedule Performance (SPI)</p>
-                <h3 class="text-2xl font-bold text-indigo-600 mt-1" id="kpiSPI">1.00</h3>
-              </div>
-              <span class="p-2.5 bg-indigo-100 text-indigo-600 rounded-lg"><i class="fa-solid fa-clock"></i></span>
-            </div>
-            <p class="text-xs text-slate-500 mt-3" id="kpiSchedStatus">Kinerja Waktu Sesuai Jadwal</p>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Schedule Performance (SPI)</p>
+            <h3 class="text-2xl font-bold text-indigo-600 mt-1" id="kpiSPI">1.00</h3>
+            <p class="text-xs text-slate-500 mt-2">Ketepatan Waktu Pelaksanaan</p>
           </div>
-
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-start">
-              <div>
-                <p class="text-xs font-semibold text-slate-400 uppercase">Kepatuhan K3 & APD</p>
-                <h3 class="text-2xl font-bold text-amber-600 mt-1" id="kpiHSE">98%</h3>
-              </div>
-              <span class="p-2.5 bg-amber-100 text-amber-600 rounded-lg"><i class="fa-solid fa-hard-hat"></i></span>
-            </div>
-            <p class="text-xs text-slate-500 mt-3">Zero Lost-Time Injury (LTI)</p>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Nilai Kontrak Aktif</p>
+            <h3 class="text-xl font-bold text-slate-900 mt-1" id="kpiContract">Rp 5.000.000.000</h3>
+            <p class="text-xs text-emerald-600 mt-2">Status: Berjalan (On-Track)</p>
           </div>
         </div>
 
-        <!-- Charts Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-            <h3 class="font-bold text-slate-800 mb-1">Kurva-S Dinamis (Rencana vs Aktual)</h3>
-            <p class="text-xs text-slate-400 mb-4">Akumulasi bobot pekerjaan berdasarkan laporan harian lapangan</p>
-            <div class="h-72">
-              <canvas id="scurveChartDash"></canvas>
-            </div>
-          </div>
-
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <h3 class="font-bold text-slate-800 mb-1">Realisasi Anggaran (Job Costing)</h3>
-            <p class="text-xs text-slate-400 mb-4">Perbandingan Nilai Kontrak, EV, dan Biaya Aktual</p>
-            <div class="h-72">
-              <canvas id="costChartDash"></canvas>
-            </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="font-bold text-slate-800 mb-3">Kurva-S Dinamis (Rencana vs Aktual)</h3>
+          <div class="h-72">
+            <canvas id="scurveChartDash"></canvas>
           </div>
         </div>
       </section>
 
-      <!-- 2. PERENCANAAN & PENJADWALAN (WBS, GANTT, CPM, S-CURVE) -->
+      <!-- 3. WBS & JADWAL KERJA -->
       <section id="tab-planning" class="tab-content hidden space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="flex justify-between items-center">
           <div>
-            <h2 class="text-2xl font-bold text-slate-900">WBS, Gantt Chart & Critical Path (CPM)</h2>
-            <p class="text-sm text-slate-500">Paket kerja terstruktur dengan identifikasi otomatis jalur kritis (Critical Path).</p>
+            <h2 class="text-2xl font-bold text-slate-900">Work Breakdown Structure (WBS) & Gantt</h2>
+            <p class="text-sm text-slate-500">Rincian jadwal pekerjaan dan jalur kritis proyek.</p>
           </div>
-          <button onclick="openModal('modalWBS')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 self-start">
-            <i class="fa-solid fa-plus"></i> Tambah Paket WBS
+          <button onclick="openModal('modalWBS')" class="admin-inline hidden bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Tambah WBS
           </button>
         </div>
 
-        <!-- Visual Gantt & CPM -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-slate-800">Visualisasi Gantt Chart & Jalur Kritis</h3>
-            <div class="flex items-center gap-4 text-xs">
-              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-500 inline-block"></span> Jalur Kritis (Critical Path)</span>
-              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-sky-500 inline-block"></span> Non-Kritis (Float)</span>
-            </div>
-          </div>
-          <div id="ganttContainer" class="space-y-3 min-w-[650px]"></div>
-        </div>
-
-        <!-- Tabel WBS -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-4 border-b border-slate-200 font-bold text-slate-800">Struktur Rincian Kerja (Work Breakdown Structure)</div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-                <tr>
-                  <th class="p-3">Kode</th>
-                  <th class="p-3">Paket Pekerjaan</th>
-                  <th class="p-3">Durasi</th>
-                  <th class="p-3">Predecessor</th>
-                  <th class="p-3">Jalur Kritis</th>
-                  <th class="p-3 text-right">Bobot</th>
-                  <th class="p-3 text-right">Progres</th>
-                  <th class="p-3 text-right">Anggaran</th>
-                </tr>
-              </thead>
-              <tbody id="wbsTableBody" class="divide-y divide-slate-200"></tbody>
-            </table>
-          </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+              <tr>
+                <th class="p-3">Kode</th>
+                <th class="p-3">Paket Pekerjaan</th>
+                <th class="p-3">Durasi</th>
+                <th class="p-3">Jalur Kritis</th>
+                <th class="p-3 text-right">Bobot</th>
+                <th class="p-3 text-right">Progres</th>
+                <th class="p-3 text-right">Anggaran</th>
+                <th class="p-3 text-center admin-cell hidden">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="wbsTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
         </div>
       </section>
 
-      <!-- 3. ANGGARAN, AHSP, RAB & EVM -->
+      <!-- 4. RAB & AHSP -->
       <section id="tab-cost" class="tab-content hidden space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="flex justify-between items-center">
           <div>
-            <h2 class="text-2xl font-bold text-slate-900">RAB, AHSP & Earned Value Management</h2>
-            <p class="text-sm text-slate-500">Analisa Harga Satuan Pekerjaan (AHSP) terintegrasi dengan kontrol biaya real-time.</p>
+            <h2 class="text-2xl font-bold text-slate-900">RAB & Analisa Harga Satuan (AHSP)</h2>
+            <p class="text-sm text-slate-500">Transparansi standar harga satuan material, upah pekerja, dan alat.</p>
           </div>
-          <button onclick="openModal('modalAHSP')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 self-start">
-            <i class="fa-solid fa-plus"></i> Tambah Item AHSP
+          <button onclick="openModal('modalAHSP')" class="admin-inline hidden bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Tambah AHSP
           </button>
         </div>
 
-        <!-- EVM Metrics Banner -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900 text-white p-5 rounded-xl">
-          <div>
-            <p class="text-xs text-slate-400">Planned Value (PV)</p>
-            <p class="text-lg font-bold text-sky-400 mt-1" id="evmPV">Rp 0</p>
-          </div>
-          <div>
-            <p class="text-xs text-slate-400">Earned Value (EV)</p>
-            <p class="text-lg font-bold text-emerald-400 mt-1" id="evmEV">Rp 0</p>
-          </div>
-          <div>
-            <p class="text-xs text-slate-400">Actual Cost (AC)</p>
-            <p class="text-lg font-bold text-amber-400 mt-1" id="evmAC">Rp 0</p>
-          </div>
-          <div>
-            <p class="text-xs text-slate-400">Cost Variance (CV = EV - AC)</p>
-            <p class="text-lg font-bold mt-1" id="evmCV">Rp 0</p>
-          </div>
-        </div>
-
-        <!-- Tabel RAB / BOQ -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-4 border-b border-slate-200 font-bold text-slate-800">Rencana Anggaran Biaya (RAB) & Bill of Quantities (BOQ)</div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-                <tr>
-                  <th class="p-3">ID</th>
-                  <th class="p-3">Uraian Pekerjaan</th>
-                  <th class="p-3">Satuan</th>
-                  <th class="p-3 text-right">Volume</th>
-                  <th class="p-3 text-right">Harga Satuan</th>
-                  <th class="p-3 text-right">Total RAB</th>
-                  <th class="p-3 text-right">Realisasi Aktual</th>
-                  <th class="p-3 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody id="rabTableBody" class="divide-y divide-slate-200"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Katalog AHSP -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-4 border-b border-slate-200 font-bold text-slate-800">Analisa Harga Satuan Pekerjaan (AHSP)</div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-                <tr>
-                  <th class="p-3">Kode AHSP</th>
-                  <th class="p-3">Kategori</th>
-                  <th class="p-3">Analisa Pekerjaan</th>
-                  <th class="p-3">Sat</th>
-                  <th class="p-3 text-right">Material</th>
-                  <th class="p-3 text-right">Upah</th>
-                  <th class="p-3 text-right">Alat</th>
-                  <th class="p-3 text-right">Harga Satuan</th>
-                </tr>
-              </thead>
-              <tbody id="ahspTableBody" class="divide-y divide-slate-200"></tbody>
-            </table>
-          </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+              <tr>
+                <th class="p-3">Kode</th>
+                <th class="p-3">Kategori</th>
+                <th class="p-3">Uraian Pekerjaan</th>
+                <th class="p-3">Satuan</th>
+                <th class="p-3 text-right">Harga Satuan</th>
+                <th class="p-3 text-center admin-cell hidden">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="ahspTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
         </div>
       </section>
 
-      <!-- 4. OPERASIONAL LAPANGAN & CHANGE ORDER (CCO) -->
-      <section id="tab-field" class="tab-content hidden space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <!-- 5. [ADMIN ONLY] KONFIRMASI PESANAN PELANGGAN -->
+      <section id="tab-orders" class="tab-content hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Manajemen & Konfirmasi Pesanan</h2>
+          <p class="text-sm text-slate-500">Konfirmasi pesanan masuk akan otomatis mencatat pemasukan ke dalam Arus Kas Keuangan.</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+              <tr>
+                <th class="p-3">ID Order</th>
+                <th class="p-3">Tanggal</th>
+                <th class="p-3">Pelanggan</th>
+                <th class="p-3">Layanan Dipesan</th>
+                <th class="p-3 text-center">Vol</th>
+                <th class="p-3 text-right">Total Nilai</th>
+                <th class="p-3 text-center">Status</th>
+                <th class="p-3 text-center">Aksi Admin</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. [ADMIN ONLY] ARUS KAS KEUANGAN & LAPORAN CETAK / PDF -->
+      <section id="tab-cashflow" class="tab-content hidden space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
           <div>
-            <h2 class="text-2xl font-bold text-slate-900">Laporan Harian Lapangan & Change Order</h2>
-            <p class="text-sm text-slate-500">Pencatatan volume kerja, tenaga kerja, cuaca, foto progres, serta manajemen tambah-kurang.</p>
+            <h2 class="text-2xl font-bold text-slate-900">Arus Kas Keuangan (Cash Flow)</h2>
+            <p class="text-sm text-slate-500">Pantau pemasukan, pengeluaran proyek, dan cetak laporan keuangan resmi ke PDF.</p>
           </div>
           <div class="flex gap-2">
-            <button onclick="openModal('modalDaily')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2">
-              <i class="fa-solid fa-camera"></i> Input Laporan Harian
+            <button onclick="openModal('modalCashFlow')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2">
+              <i class="fa-solid fa-plus"></i> Catat Transaksi Kas
             </button>
-            <button onclick="openModal('modalCCO')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2">
-              <i class="fa-solid fa-file-signature"></i> Ajukan Change Order
+            <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2">
+              <i class="fa-solid fa-print"></i> Cetak / Simpan PDF
             </button>
           </div>
         </div>
 
-        <!-- Change Order Management -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-4 border-b border-slate-200 font-bold text-slate-800">Contract Change Order (CCO / Pekerjaan Tambah-Kurang)</div>
+        <!-- Area Cetak PDF Resmi -->
+        <div id="printableArea" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+          <!-- Kop Surat Perusahaan -->
+          <div class="border-b-2 border-slate-900 pb-4 flex justify-between items-end">
+            <div>
+              <h3 class="text-xl font-bold text-slate-900 uppercase" id="printCompanyName">PT. KARYA KONSTRUKSI NUSANTARA</h3>
+              <p class="text-xs text-slate-600" id="printCompanyAddress">Jl. Kaliurang Km 5.5, Sleman, DI Yogyakarta</p>
+              <p class="text-xs text-slate-600">WhatsApp / Telp: <span id="printCompanyWA">6281234567890</span></p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs font-bold uppercase tracking-wider bg-slate-100 px-3 py-1 rounded">Laporan Arus Kas</span>
+              <p class="text-xs text-slate-500 mt-1">Dicetak: <span id="printDate"></span></p>
+            </div>
+          </div>
+
+          <!-- Ringkasan Saldo -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p class="text-xs font-semibold text-emerald-700 uppercase">Total Pemasukan</p>
+              <p class="text-xl font-bold text-emerald-900 mt-1" id="cfTotalIn">Rp 0</p>
+            </div>
+            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200">
+              <p class="text-xs font-semibold text-rose-700 uppercase">Total Pengeluaran</p>
+              <p class="text-xl font-bold text-rose-900 mt-1" id="cfTotalOut">Rp 0</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-900 text-white">
+              <p class="text-xs font-semibold text-slate-400 uppercase">Saldo Kas Bersih</p>
+              <p class="text-xl font-bold text-sky-400 mt-1" id="cfBalance">Rp 0</p>
+            </div>
+          </div>
+
+          <!-- Tabel Mutasi Arus Kas -->
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
-              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+              <thead class="bg-slate-100 text-slate-700 text-xs uppercase">
                 <tr>
-                  <th class="p-3">No. CCO</th>
-                  <th class="p-3">Perihal Perubahan</th>
-                  <th class="p-3">Jenis</th>
-                  <th class="p-3 text-right">Dampak Biaya</th>
-                  <th class="p-3 text-center">Dampak Waktu</th>
-                  <th class="p-3 text-center">Status</th>
-                  <th class="p-3 text-center">Aksi</th>
+                  <th class="p-3 border-b">Tanggal</th>
+                  <th class="p-3 border-b">Jenis</th>
+                  <th class="p-3 border-b">Kategori</th>
+                  <th class="p-3 border-b">Keterangan Transaksi</th>
+                  <th class="p-3 border-b text-right">Nominal</th>
+                  <th class="p-3 border-b text-center no-print">Hapus</th>
                 </tr>
               </thead>
-              <tbody id="ccoTableBody" class="divide-y divide-slate-200"></tbody>
+              <tbody id="cashFlowTableBody" class="divide-y divide-slate-200"></tbody>
             </table>
           </div>
-        </div>
 
-        <!-- Daily Reports Feed -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h3 class="font-bold text-slate-800 mb-4">Log Laporan Harian Terkini</h3>
-          <div id="dailyReportsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          <!-- Kolom Tanda Tangan untuk PDF -->
+          <div class="pt-8 flex justify-end">
+            <div class="text-center w-56">
+              <p class="text-xs text-slate-600">Mengetahui, Direktur / Admin Keuangan</p>
+              <div class="h-16"></div>
+              <p class="text-xs font-bold border-t border-slate-400 pt-1" id="printSignCompany">PT. KARYA KONSTRUKSI NUSANTARA</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- 5. ALAT BERAT & MATERIAL -->
-      <section id="tab-resources" class="tab-content hidden space-y-6">
+      <!-- 7. [ADMIN ONLY] LAPORAN HARIAN LAPANGAN -->
+      <section id="tab-field" class="tab-content hidden space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h2 class="text-2xl font-bold text-slate-900">Manajemen Alat Berat & Material</h2>
-            <p class="text-sm text-slate-500">Pelacakan status operasi, alokasi paket WBS, dan jadwal pemeliharaan preventif.</p>
+            <h2 class="text-2xl font-bold text-slate-900">Input Laporan Harian Lapangan</h2>
+            <p class="text-sm text-slate-500">Pembaruan progres fisik lapangan dan dokumentasi foto ke Google Drive.</p>
           </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-              <tr>
-                <th class="p-3">ID Alat</th>
-                <th class="p-3">Nama Alat / Resource</th>
-                <th class="p-3">Kategori</th>
-                <th class="p-3">Alokasi WBS</th>
-                <th class="p-3">Jadwal Maintenance</th>
-                <th class="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody id="equipTableBody" class="divide-y divide-slate-200"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 6. DOKUMEN & KONTROL VERSI GAMBAR -->
-      <section id="tab-documents" class="tab-content hidden space-y-6">
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-900">Manajemen Dokumen & Gambar Kerja</h2>
-            <p class="text-sm text-slate-500">Kontrol versi Shop Drawing, As-Built Drawing, dan kontrak agar tim lapangan memakai revisi terbaru.</p>
-          </div>
-          <button onclick="openModal('modalDoc')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2">
-            <i class="fa-solid fa-upload"></i> Registrasi Dokumen
+          <button onclick="openModal('modalDaily')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2">
+            <i class="fa-solid fa-camera"></i> Input Laporan Baru
           </button>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-              <tr>
-                <th class="p-3">No. Dokumen</th>
-                <th class="p-3">Jenis</th>
-                <th class="p-3">Judul Dokumen / Gambar</th>
-                <th class="p-3">Revisi / Versi</th>
-                <th class="p-3">Status</th>
-                <th class="p-3">Tautan</th>
-              </tr>
-            </thead>
-            <tbody id="docTableBody" class="divide-y divide-slate-200"></tbody>
-          </table>
-        </div>
+        <div id="dailyReportsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </section>
 
-      <!-- 7. QUALITY CONTROL & K3 (HSE) -->
-      <section id="tab-qchse" class="tab-content hidden space-y-6">
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-900">Quality Control (QC) & Keselamatan Kerja (HSE)</h2>
-            <p class="text-sm text-slate-500">Checklist inspeksi mutu pekerjaan, toolbox meeting, dan audit kepatuhan APD.</p>
-          </div>
-          <button onclick="openModal('modalQCHSE')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2">
-            <i class="fa-solid fa-plus"></i> Catat Inspeksi QC / K3
-          </button>
+      <!-- 8. [ADMIN ONLY] PENGATURAN PERUSAHAAN & PASSWORD ADMIN -->
+      <section id="tab-settings" class="tab-content hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Pengaturan Profil Perusahaan & Keamanan Admin</h2>
+          <p class="text-sm text-slate-500">Kelola identitas perusahaan pada kop laporan PDF, nomor WhatsApp pemesanan, dan password admin.</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-              <tr>
-                <th class="p-3">Tanggal</th>
-                <th class="p-3">Kategori</th>
-                <th class="p-3">Objek Inspeksi / Kegiatan</th>
-                <th class="p-3">Hasil</th>
-                <th class="p-3 text-center">Kepatuhan APD</th>
-                <th class="p-3">Inspektor</th>
-                <th class="p-3">Catatan</th>
-              </tr>
-            </thead>
-            <tbody id="qchseTableBody" class="divide-y divide-slate-200"></tbody>
-          </table>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Form Profil Perusahaan -->
+          <form onsubmit="saveCompanySettings(event)" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <h3 class="font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-building text-sky-600 mr-2"></i>Identitas Perusahaan & WhatsApp</h3>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Nama Perusahaan / Kontraktor</label>
+              <input type="text" id="setCompanyName" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Alamat Lengkap Kantor</label>
+              <textarea id="setCompanyAddress" rows="2" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Nomor WhatsApp Admin (Awali dengan 62, contoh: 6281234567890)</label>
+              <input type="text" id="setAdminWA" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1" />
+            </div>
+            <button type="submit" class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-5 py-2.5 rounded-lg">
+              Simpan Profil Perusahaan
+            </button>
+          </form>
+
+          <!-- Form Ganti Password Admin -->
+          <form onsubmit="changeAdminPassword(event)" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <h3 class="font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-key text-amber-500 mr-2"></i>Ganti Password Login Admin</h3>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Password Lama</label>
+              <input type="password" id="oldPassword" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Password Baru</label>
+              <input type="password" id="newPassword" required minlength="4" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Konfirmasi Password Baru</label>
+              <input type="password" id="confirmNewPassword" required minlength="4" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm mt-1" />
+            </div>
+            <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-lg">
+              Perbarui Password Admin
+            </button>
+          </form>
         </div>
       </section>
 
     </main>
   </div>
 
+  <!-- MODAL: LOGIN ADMIN -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="p-2.5 bg-slate-900 text-sky-400 rounded-xl"><i class="fa-solid fa-shield-halved text-lg"></i></div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Login Administrator</h3>
+          <p class="text-xs text-slate-500">Masukkan password untuk mengelola sistem</p>
+        </div>
+      </div>
+      <form onsubmit="submitLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Password Admin</label>
+          <input type="password" id="loginPasswordInput" placeholder="Default: admin123" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500" />
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal('loginModal')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+          <button type="submit" id="btnLoginSubmit" class="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800">Masuk Dashboard</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: FORM PEMESANAN PELANGGAN (PUBLIK -> WHATSAPP) -->
+  <div id="orderModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900">Pesan Layanan Konstruksi</h3>
+      <p class="text-xs text-slate-500 mt-0.5" id="orderServiceTitle">Paket Layanan</p>
+      <form onsubmit="submitCustomerOrder(event)" class="mt-4 space-y-3 text-sm">
+        <input type="hidden" id="orderServiceId" />
+        <input type="hidden" id="orderUnitPrice" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nama Lengkap / Instansi</label>
+          <input type="text" id="orderCustName" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nomor WhatsApp Anda</label>
+          <input type="tel" id="orderCustWA" placeholder="0812..." required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Estimasi Volume (<span id="orderUnitLabel">m2</span>)</label>
+            <input type="number" id="orderVolume" value="1" min="1" oninput="calcOrderTotal()" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Estimasi Total Biaya</label>
+            <input type="text" id="orderTotalDisplay" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 mt-1 font-bold text-slate-900" />
+          </div>
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('orderModal')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center gap-1.5">
+            <i class="fa-brands fa-whatsapp"></i> Kirim Pesanan ke WhatsApp
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TAMBAH / EDIT LAYANAN (ADMIN) -->
+  <div id="serviceModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900" id="serviceModalHeading">Tambah Layanan Baru</h3>
+      <form onsubmit="saveService(event)" class="mt-4 space-y-3 text-sm">
+        <input type="hidden" id="srvEditId" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nama Layanan / Paket</label>
+          <input type="text" id="srvName" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Kategori</label>
+            <input type="text" id="srvCat" placeholder="Konstruksi / Renovasi" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Satuan</label>
+            <input type="text" id="srvUnit" placeholder="m2 / m3 / Paket" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Harga Satuan (Rp)</label>
+          <input type="number" id="srvPrice" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Deskripsi Singkat</label>
+          <textarea id="srvDesc" rows="2" required class="w-full border border-slate-300 rounded-lg p-2 mt-1"></textarea>
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('serviceModal')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg">Simpan Layanan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CATAT TRANSAKSI ARUS KAS (ADMIN) -->
+  <div id="modalCashFlow" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900">Catat Transaksi Arus Kas</h3>
+      <form onsubmit="submitCashFlow(event)" class="mt-4 space-y-3 text-sm">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Tanggal</label>
+            <input type="date" id="cfDate" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Jenis Arus Kas</label>
+            <select id="cfType" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
+              <option value="Pemasukan">Pemasukan (+)</option>
+              <option value="Pengeluaran">Pengeluaran (-)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Kategori</label>
+          <input type="text" id="cfCategory" placeholder="Termin Proyek / Material / Upah" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Keterangan Transaksi</label>
+          <input type="text" id="cfDesc" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nominal (Rp)</label>
+          <input type="number" id="cfAmount" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modalCashFlow')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded-lg">Simpan Transaksi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: KONEKSI API GOOGLE SHEETS -->
-  <div id="apiModal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+  <div id="apiModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
       <h3 class="text-lg font-bold text-slate-900">Hubungkan ke Google Sheets Backend</h3>
-      <p class="text-xs text-slate-500 mt-1">Tempelkan URL Web App dari hasil Deploy Google Apps Script (`code.gs`).</p>
-      <div class="mt-4">
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Web App URL (exec)</label>
-        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500" />
-      </div>
-      <div class="mt-5 flex justify-end gap-2">
-        <button onclick="closeModal('apiModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
-        <button onclick="saveApiUrl()" class="px-4 py-2 text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg">Simpan & Sinkronkan</button>
+      <p class="text-xs text-slate-500 mt-1">Tempelkan URL Web App dari Google Apps Script (`code.gs`).</p>
+      <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-3" />
+      <div class="mt-4 flex justify-end gap-2">
+        <button onclick="closeModal('apiModal')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+        <button onclick="saveApiUrl()" class="px-4 py-2 text-xs font-bold bg-sky-500 text-slate-950 rounded-lg">Simpan & Sinkronkan</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: INPUT LAPORAN HARIAN + FOTO -->
-  <div id="modalDaily" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+  <!-- MODAL: INPUT LAPORAN HARIAN -->
+  <div id="modalDaily" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
       <h3 class="text-lg font-bold text-slate-900">Input Laporan Harian Lapangan</h3>
       <form onsubmit="submitDailyReport(event)" class="mt-4 space-y-3 text-sm">
         <div>
@@ -451,418 +564,544 @@
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700">Tanggal</label>
-            <input type="date" id="dailyDate" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Cuaca</label>
-            <select id="dailyWeather" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="Cerah">Cerah</option>
-              <option value="Berawan">Berawan</option>
-              <option value="Hujan Ringan">Hujan Ringan</option>
-              <option value="Hujan Lebat (Stop Work)">Hujan Lebat (Stop Work)</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Jumlah Pekerja</label>
-            <input type="number" id="dailyWorkers" value="25" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
             <label class="block text-xs font-semibold text-slate-700">Update Progres (%)</label>
             <input type="number" id="dailyNewPct" min="0" max="100" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700">Biaya Hari Ini (Rp)</label>
-            <input type="number" id="dailyCost" value="15000000" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Volume & Catatan Pekerjaan</label>
-          <textarea id="dailyNotes" rows="2" required placeholder="Contoh: Pengecoran kolom zona B selesai 35 m3" class="w-full border border-slate-300 rounded-lg p-2 mt-1"></textarea>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Unggah Foto Progres (Otomatis ke Google Drive)</label>
-          <input type="file" id="dailyPhoto" accept="image/*" class="w-full text-xs text-slate-500 mt-1" />
-        </div>
-        <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalDaily')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" id="btnSubmitDaily" class="px-4 py-2 text-xs font-semibold bg-sky-600 text-white rounded-lg">Kirim Laporan</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: TAMBAH CHANGE ORDER -->
-  <div id="modalCCO" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900">Pengajuan Change Order (CCO)</h3>
-      <form onsubmit="submitCCO(event)" class="mt-4 space-y-3 text-sm">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Judul / Uraian Perubahan</label>
-          <input type="text" id="ccoTitle" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Jenis</label>
-            <select id="ccoType" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="Addition">Tambah (Addition)</option>
-              <option value="Deduction">Kurang (Deduction)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Dampak Waktu (Hari)</label>
-            <input type="number" id="ccoDays" value="0" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Dampak Biaya (Rp)</label>
-          <input type="number" id="ccoCost" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalCCO')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg">Simpan CCO</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: TAMBAH WBS -->
-  <div id="modalWBS" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900">Tambah Paket Pekerjaan WBS</h3>
-      <form onsubmit="submitWBS(event)" class="mt-4 space-y-3 text-sm">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Kode WBS</label>
-            <input type="text" id="wbsCode" placeholder="4.2" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Jalur Kritis?</label>
-            <select id="wbsCritical" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="Yes">Ya (Critical)</option>
-              <option value="No">Tidak (Non-Critical)</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Nama Paket Pekerjaan</label>
-          <input type="text" id="wbsName" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Tanggal Mulai</label>
-            <input type="date" id="wbsStart" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Tanggal Selesai</label>
-            <input type="date" id="wbsEnd" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Bobot (%)</label>
-            <input type="number" id="wbsWeight" value="5" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Anggaran (Rp)</label>
-            <input type="number" id="wbsBudget" value="150000000" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalWBS')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg">Simpan WBS</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: TAMBAH AHSP -->
-  <div id="modalAHSP" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900">Tambah Analisa Harga Satuan (AHSP)</h3>
-      <form onsubmit="submitAHSP(event)" class="mt-4 space-y-3 text-sm">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Kategori</label>
-            <input type="text" id="ahspCat" placeholder="Beton / Baja" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Satuan</label>
-            <input type="text" id="ahspUnit" placeholder="m3 / m2 / kg" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Nama Analisa Pekerjaan</label>
-          <input type="text" id="ahspName" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="grid grid-cols-3 gap-2">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Harga Bahan</label>
-            <input type="number" id="ahspMat" value="0" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Upah Kerja</label>
-            <input type="number" id="ahspLab" value="0" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Sewa Alat</label>
-            <input type="number" id="ahspEqp" value="0" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalAHSP')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg">Simpan AHSP</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: REGISTRASI DOKUMEN -->
-  <div id="modalDoc" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900">Registrasi Dokumen / Gambar Kerja</h3>
-      <form onsubmit="submitDoc(event)" class="mt-4 space-y-3 text-sm">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Jenis Dokumen</label>
-            <select id="docType" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="Shop Drawing">Shop Drawing</option>
-              <option value="As-Built Drawing">As-Built Drawing</option>
-              <option value="Kontrak / Adendum">Kontrak / Adendum</option>
-              <option value="Berita Acara">Berita Acara</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Versi / Revisi</label>
-            <input type="text" id="docVer" value="Rev. 01" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Judul Dokumen</label>
-          <input type="text" id="docTitle" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Link File (Google Drive / CAD Cloud)</label>
-          <input type="url" id="docUrl" value="https://drive.google.com" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalDoc')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg">Simpan Dokumen</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: QC & HSE LOG -->
-  <div id="modalQCHSE" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900">Catat Inspeksi QC / Laporan K3</h3>
-      <form onsubmit="submitQCHSE(event)" class="mt-4 space-y-3 text-sm">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Kategori</label>
-            <select id="qcCategory" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="QC Inspection">QC Inspection (Mutu)</option>
-              <option value="HSE / K3">HSE / K3 (Keselamatan)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Kepatuhan APD (%)</label>
-            <input type="number" id="qcApd" value="100" min="0" max="100" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Judul Inspeksi / Toolbox Meeting</label>
-          <input type="text" id="qcTitle" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Status Hasil</label>
-            <select id="qcStatus" class="w-full border border-slate-300 rounded-lg p-2 mt-1">
-              <option value="Passed">Passed / Lulus</option>
-              <option value="Zero Accident">Zero Accident</option>
-              <option value="NCR (Perlu Perbaikan)">NCR (Perlu Perbaikan)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700">Nama Inspektor</label>
-            <input type="text" id="qcInspector" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
+            <input type="number" id="dailyCost" value="10000000" required class="w-full border border-slate-300 rounded-lg p-2 mt-1" />
           </div>
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700">Catatan Lapangan</label>
-          <textarea id="qcRemarks" rows="2" class="w-full border border-slate-300 rounded-lg p-2 mt-1"></textarea>
+          <textarea id="dailyNotes" rows="2" required class="w-full border border-slate-300 rounded-lg p-2 mt-1"></textarea>
         </div>
         <div class="pt-3 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalQCHSE')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg">Simpan Log</button>
+          <button type="button" onclick="closeModal('modalDaily')" class="px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-sky-600 text-white rounded-lg">Simpan Laporan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TAMBAH WBS & AHSP -->
+  <div id="modalWBS" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900">Tambah Paket WBS</h3>
+      <form onsubmit="submitWBS(event)" class="mt-4 space-y-3 text-sm">
+        <input type="text" id="wbsCode" placeholder="Kode WBS (misal: 4.2)" required class="w-full border border-slate-300 rounded-lg p-2" />
+        <input type="text" id="wbsName" placeholder="Nama Paket Pekerjaan" required class="w-full border border-slate-300 rounded-lg p-2" />
+        <div class="grid grid-cols-2 gap-2">
+          <input type="number" id="wbsWeight" placeholder="Bobot (%)" required class="w-full border border-slate-300 rounded-lg p-2" />
+          <input type="number" id="wbsBudget" placeholder="Anggaran (Rp)" required class="w-full border border-slate-300 rounded-lg p-2" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalWBS')" class="px-4 py-2 text-xs">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modalAHSP" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900">Tambah Analisa Harga Satuan (AHSP)</h3>
+      <form onsubmit="submitAHSP(event)" class="mt-4 space-y-3 text-sm">
+        <input type="text" id="ahspCat" placeholder="Kategori (Beton / Baja)" required class="w-full border border-slate-300 rounded-lg p-2" />
+        <input type="text" id="ahspName" placeholder="Nama Pekerjaan" required class="w-full border border-slate-300 rounded-lg p-2" />
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="ahspUnit" placeholder="Satuan (m3/m2)" required class="w-full border border-slate-300 rounded-lg p-2" />
+          <input type="number" id="ahspPrice" placeholder="Harga Satuan (Rp)" required class="w-full border border-slate-300 rounded-lg p-2" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalAHSP')" class="px-4 py-2 text-xs">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg">Simpan</button>
         </div>
       </form>
     </div>
   </div>
 
 <script>
-  // State Management
-  let API_URL = 'https://script.google.com/macros/s/AKfycbz951EYg6XGyrqUptiAn61pCYx0_svDybigNdjQ_RRWZljPu4Dk2lCQvNPgOsOAYxqQ/exec';
+  let API_URL = localStorage.getItem("SIMPRO_GAS_URL") || "";
+  let adminSessionPass = sessionStorage.getItem("SIMPRO_ADMIN_PASS") || "";
+  let localFallbackPass = localStorage.getItem("SIMPRO_LOCAL_PASS") || "admin123";
+  let scurveChartInstance = null;
+
   let appData = {
-    Projects: [{ Project_ID: "PRJ-001", Project_Name: "Pembangunan Gedung Perkantoran 5 Lantai", Client: "PT. Maju Bersama", Contract_Value: 5000000000 }],
+    PublicSettings: {
+      Company_Name: "PT. KARYA KONSTRUKSI NUSANTARA",
+      Company_Address: "Jl. Kaliurang Km 5.5, Sleman, DI Yogyakarta",
+      Admin_WA: "6281234567890"
+    },
+    Services: [
+      { Service_ID: "SRV-01", Service_Name: "Jasa Bangun Rumah & Gedung (Turnkey)", Category: "Konstruksi Baru", Unit: "m2", Price: 4500000, Description: "Pembangunan struktur hingga finishing standar premium." },
+      { Service_ID: "SRV-02", Service_Name: "Renovasi Atap Baja Ringan & Plafon", Category: "Renovasi", Unit: "m2", Price: 385000, Description: "Rangka baja ringan SNI 0.75mm + genteng metal pasir." },
+      { Service_ID: "SRV-03", Service_Name: "Pengecoran Beton Struktur K-300", Category: "Struktur", Unit: "m3", Price: 1450000, Description: "Sudah termasuk bekisting, pembesian, dan ready mix." }
+    ],
+    Orders: [
+      { Order_ID: "ORD-101", Order_Date: "2026-11-14", Customer_Name: "Bpk. Hendra Wijaya", Customer_WA: "628122334455", Service_Name: "Renovasi Atap Baja Ringan & Plafon", Volume: 85, Total_Price: 32725000, Status: "Confirmed" },
+      { Order_ID: "ORD-102", Order_Date: "2026-11-15", Customer_Name: "Ibu Ratna Sari", Customer_WA: "628567891234", Service_Name: "Jasa Bangun Rumah & Gedung (Turnkey)", Volume: 120, Total_Price: 540000000, Status: "Pending" }
+    ],
+    CashFlow: [
+      { Tx_ID: "TX-001", Date: "2026-11-01", Type: "Pemasukan", Category: "Termin Proyek", Description: "Termin 1 Pembangunan Gedung Perkantoran", Amount: 1500000000 },
+      { Tx_ID: "TX-002", Date: "2026-11-05", Type: "Pengeluaran", Category: "Material", Description: "Pembelian Besi Ulir & Semen Ready Mix", Amount: 620000000 },
+      { Tx_ID: "TX-003", Date: "2026-11-10", Type: "Pengeluaran", Category: "Upah Tenaga", Description: "Pembayaran Mandor & Tukang", Amount: 185000000 }
+    ],
     WBS_Tasks: [
-      { Task_ID: "TSK-01", WBS_Code: "1.1", Task_Name: "Pekerjaan Persiapan & Bouwplank", Start_Date: "2026-01-01", End_Date: "2026-01-14", Duration_Days: 14, Predecessor_ID: "-", Is_Critical: "Yes", Weight_Pct: 5, Progress_Pct: 100, Budget_Cost: 250000000, Actual_Cost: 240000000 },
-      { Task_ID: "TSK-02", WBS_Code: "1.2", Task_Name: "Galian Tanah & Pondasi Borepile", Start_Date: "2026-01-15", End_Date: "2026-02-15", Duration_Days: 31, Predecessor_ID: "TSK-01", Is_Critical: "Yes", Weight_Pct: 20, Progress_Pct: 100, Budget_Cost: 1000000000, Actual_Cost: 1050000000 },
-      { Task_ID: "TSK-03", WBS_Code: "2.1", Task_Name: "Struktur Beton Bertulang Lt. 1-3", Start_Date: "2026-02-16", End_Date: "2026-04-10", Duration_Days: 53, Predecessor_ID: "TSK-02", Is_Critical: "Yes", Weight_Pct: 35, Progress_Pct: 80, Budget_Cost: 1750000000, Actual_Cost: 1420000000 },
-      { Task_ID: "TSK-04", WBS_Code: "2.2", Task_Name: "Struktur Atap Baja & Dak", Start_Date: "2026-04-11", End_Date: "2026-05-10", Duration_Days: 29, Predecessor_ID: "TSK-03", Is_Critical: "Yes", Weight_Pct: 15, Progress_Pct: 20, Budget_Cost: 750000000, Actual_Cost: 180000000 },
-      { Task_ID: "TSK-05", WBS_Code: "3.1", Task_Name: "Pekerjaan Dinding Bata Ringan & Plester", Start_Date: "2026-03-15", End_Date: "2026-05-15", Duration_Days: 61, Predecessor_ID: "TSK-02", Is_Critical: "No", Weight_Pct: 15, Progress_Pct: 45, Budget_Cost: 750000000, Actual_Cost: 310000000 },
-      { Task_ID: "TSK-06", WBS_Code: "4.1", Task_Name: "MEP, Finishing & Testing Commissioning", Start_Date: "2026-05-11", End_Date: "2026-06-30", Duration_Days: 50, Predecessor_ID: "TSK-04", Is_Critical: "Yes", Weight_Pct: 10, Progress_Pct: 0, Budget_Cost: 500000000, Actual_Cost: 0 }
+      { Task_ID: "TSK-01", WBS_Code: "1.1", Task_Name: "Pekerjaan Persiapan & Bouwplank", Duration_Days: 14, Is_Critical: "Yes", Weight_Pct: 5, Progress_Pct: 100, Budget_Cost: 250000000, Actual_Cost: 240000000 },
+      { Task_ID: "TSK-02", WBS_Code: "1.2", Task_Name: "Galian Tanah & Pondasi Borepile", Duration_Days: 31, Is_Critical: "Yes", Weight_Pct: 20, Progress_Pct: 100, Budget_Cost: 1000000000, Actual_Cost: 1050000000 },
+      { Task_ID: "TSK-03", WBS_Code: "2.1", Task_Name: "Struktur Beton Bertulang Lt. 1-3", Duration_Days: 53, Is_Critical: "Yes", Weight_Pct: 35, Progress_Pct: 80, Budget_Cost: 1750000000, Actual_Cost: 1420000000 },
+      { Task_ID: "TSK-04", WBS_Code: "2.2", Task_Name: "Struktur Atap Baja & Dak", Duration_Days: 29, Is_Critical: "Yes", Weight_Pct: 15, Progress_Pct: 20, Budget_Cost: 750000000, Actual_Cost: 180000000 }
     ],
     AHSP_Catalog: [
-      { AHSP_ID: "AHSP-01", Work_Category: "Beton", Work_Name: "Beton Mutu K-300 Ready Mix", Unit: "m3", Material_Cost: 1100000, Labor_Cost: 180000, Equipment_Cost: 120000, Unit_Price: 1400000 },
-      { AHSP_ID: "AHSP-02", Work_Category: "Pembesian", Work_Name: "Pembesian Besi Ulir U-39", Unit: "kg", Material_Cost: 13500, Labor_Cost: 2200, Equipment_Cost: 500, Unit_Price: 16200 },
-      { AHSP_ID: "AHSP-03", Work_Category: "Dinding", Work_Name: "Pasangan Bata Ringan 10cm + Mortar", Unit: "m2", Material_Cost: 115000, Labor_Cost: 45000, Equipment_Cost: 5000, Unit_Price: 165000 }
-    ],
-    RAB_BOQ: [
-      { RAB_ID: "RAB-01", Item_Description: "Galian Tanah Basement & Pondasi", Unit: "m3", Volume: 1200, Unit_Price: 90000, Total_Budget: 108000000, Actual_Spent: 112000000 },
-      { RAB_ID: "RAB-02", Item_Description: "Cor Beton Struktur Utama K-300", Unit: "m3", Volume: 1500, Unit_Price: 1400000, Total_Budget: 2100000000, Actual_Spent: 1650000000 },
-      { RAB_ID: "RAB-03", Item_Description: "Besi Tulangan Struktur", Unit: "kg", Volume: 110000, Unit_Price: 16200, Total_Budget: 1782000000, Actual_Spent: 1200000000 }
+      { AHSP_ID: "AHSP-01", Work_Category: "Beton", Work_Name: "Beton Mutu K-300 Ready Mix", Unit: "m3", Unit_Price: 1400000 },
+      { AHSP_ID: "AHSP-02", Work_Category: "Pembesian", Work_Name: "Pembesian Besi Ulir U-39", Unit: "kg", Unit_Price: 16200 }
     ],
     Daily_Reports: [
-      { Report_ID: "REP-001", Date: "2026-11-14", Task_ID: "TSK-03", Weather: "Cerah", Workers_Count: 42, Notes: "Pengecoran kolom lantai 3 berjalan lancar sesuai slump test 12±2 cm.", Photo_URL: "", Reported_By: "Ir. Budi Santoso" }
-    ],
-    Change_Orders: [
-      { CO_ID: "CCO-001", Title: "Penambahan Kanopi Baja Area Lobby", Type: "Addition", Cost_Impact: 145000000, Time_Impact_Days: 7, Status: "Approved" }
-    ],
-    Resources_Equip: [
-      { Equip_ID: "EQP-01", Equipment_Name: "Tower Crane Potain MC85", Category: "Alat Berat", Allocated_Task: "TSK-03", Next_Maintenance: "2026-12-01", Status: "Operating" },
-      { Equip_ID: "EQP-02", Equipment_Name: "Concrete Pump Long Boom", Category: "Alat Cor", Allocated_Task: "TSK-03", Next_Maintenance: "2026-11-25", Status: "Standby" },
-      { Equip_ID: "EQP-03", Equipment_Name: "Excavator PC-200", Category: "Alat Berat", Allocated_Task: "-", Next_Maintenance: "2026-11-18", Status: "Maintenance" }
-    ],
-    Documents: [
-      { Doc_ID: "DOC-001", Doc_Type: "Shop Drawing", Title: "Denah Struktur & Penulangan Lt. 3", Version: "Rev. 03 (Latest)", Status: "Approved for Construction", File_URL: "https://drive.google.com" },
-      { Doc_ID: "DOC-002", Doc_Type: "Kontrak", Title: "SPK Induk Pembangunan Gedung", Version: "Rev. 00", Status: "Signed", File_URL: "https://drive.google.com" }
-    ],
-    QC_HSE_Logs: [
-      { Log_ID: "LOG-001", Date: "2026-11-12", Category: "QC Inspection", Title: "Inspeksi Pembesian Balok B1 Lt. 3", Result_Status: "Passed", APD_Compliance_Pct: 100, Inspector: "Andi (QC Eng)", Remarks: "Jumlah dan jarak sengkang sesuai shop drawing." },
-      { Log_ID: "LOG-002", Date: "2026-11-15", Category: "HSE / K3", Title: "Toolbox Meeting & Inspeksi Scaffolding", Result_Status: "Zero Accident", APD_Compliance_Pct: 98, Inspector: "Rina (HSE Officer)", Remarks: "2 pekerja diingatkan penggunaan chin-strap helm." }
+      { Report_ID: "REP-001", Date: "2026-11-14", Task_ID: "TSK-03", Notes: "Pengecoran kolom lantai 3 selesai 45 m3." }
     ]
   };
 
-  let scurveChartInstance = null;
-  let costChartInstance = null;
-
-  // Format Rupiah
   const formatIDR = (num) => "Rp " + Number(num || 0).toLocaleString("id-ID");
 
-  // Navigation Tabs (Desktop & Mobile Synchronized)
+  // --- AUTHENTICATION & ROLE UI ---
+  function applyRoleState() {
+    const isAdmin = Boolean(adminSessionPass);
+    const btn = document.getElementById("btnLoginToggle");
+    const badge = document.getElementById("roleBadge");
+
+    if (isAdmin) {
+      document.body.classList.add("is-admin");
+      btn.className = "bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition flex items-center gap-2";
+      btn.innerHTML = `<i class="fa-solid fa-right-from-bracket"></i> <span>Logout Admin</span>`;
+      badge.className = "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+      badge.innerHTML = `<i class="fa-solid fa-user-shield"></i> Mode Administrator`;
+    } else {
+      document.body.classList.remove("is-admin");
+      btn.className = "bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg transition flex items-center gap-2";
+      btn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Login Admin</span>`;
+      badge.className = "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700";
+      badge.innerHTML = `<i class="fa-solid fa-eye text-sky-400"></i> Mode Pengunjung`;
+      switchTab("services"); // Kembalikan ke halaman publik saat logout
+    }
+    renderAll();
+  }
+
+  window.handleAuthClick = function() {
+    if (adminSessionPass) {
+      adminSessionPass = "";
+      sessionStorage.removeItem("SIMPRO_ADMIN_PASS");
+      applyRoleState();
+    } else {
+      openModal("loginModal");
+    }
+  };
+
+  window.submitLogin = async function(e) {
+    e.preventDefault();
+    const pass = document.getElementById("loginPasswordInput").value;
+    const btn = document.getElementById("btnLoginSubmit");
+    btn.innerText = "Memeriksa...";
+
+    if (API_URL) {
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "loginAdmin", password: pass })
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+          adminSessionPass = pass;
+          sessionStorage.setItem("SIMPRO_ADMIN_PASS", pass);
+          closeModal("loginModal");
+          document.getElementById("loginPasswordInput").value = "";
+          applyRoleState();
+        } else {
+          alert(json.message || "Password salah!");
+        }
+      } catch (err) {
+        alert("Gagal terhubung ke server.");
+      }
+    } else {
+      if (pass === localFallbackPass) {
+        adminSessionPass = pass;
+        sessionStorage.setItem("SIMPRO_ADMIN_PASS", pass);
+        closeModal("loginModal");
+        document.getElementById("loginPasswordInput").value = "";
+        applyRoleState();
+      } else {
+        alert("Password salah! (Default simulasi: admin123)");
+      }
+    }
+    btn.innerText = "Masuk Dashboard";
+  };
+
+  // --- NAVIGATION & MODALS ---
   window.switchTab = function(tabName) {
     document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
-    const targetTab = document.getElementById(`tab-${tabName}`);
-    if (targetTab) targetTab.classList.remove("hidden");
+    const target = document.getElementById(`tab-${tabName}`);
+    if (target) target.classList.remove("hidden");
 
-    // Update Desktop Sidebar Buttons
     document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("tab-active"));
-    const activeBtn = document.getElementById(`nav-${tabName}`);
-    if (activeBtn) activeBtn.classList.add("tab-active");
-
-    // Update Mobile Bottom Nav Buttons
-    document.querySelectorAll(".mob-btn").forEach(btn => {
-      btn.classList.remove("text-sky-400");
-      btn.classList.add("text-slate-400");
-    });
-    const activeMob = document.getElementById(`mob-${tabName}`);
-    if (activeMob) {
-      activeMob.classList.remove("text-slate-400");
-      activeMob.classList.add("text-sky-400");
-    }
+    const navBtn = document.getElementById(`nav-${tabName}`);
+    if (navBtn) navBtn.classList.add("tab-active");
   };
 
-  // Modal Handlers
   window.openModal = function(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
-    }
+    const m = document.getElementById(id);
+    if (m) { m.classList.remove("hidden"); m.classList.add("flex"); }
   };
-
   window.closeModal = function(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-      modal.classList.add("hidden");
-      modal.classList.remove("flex");
-    }
+    const m = document.getElementById(id);
+    if (m) { m.classList.add("hidden"); m.classList.remove("flex"); }
   };
 
   window.openApiModal = function() {
-    const input = document.getElementById("apiUrlInput");
-    if (input) input.value = API_URL;
+    document.getElementById("apiUrlInput").value = API_URL;
     openModal("apiModal");
   };
-
   window.saveApiUrl = function() {
-    const input = document.getElementById("apiUrlInput");
-    if (input) {
-      API_URL = input.value.trim();
-      localStorage.setItem("SIMPRO_GAS_URL", API_URL);
-    }
+    API_URL = 'https://script.google.com/macros/s/AKfycbx1A71Y8o4H800uEYTsDl4Lr2ZXWp0CQwxKFUMQxoKPHG7R3xIlVxh6tOPDgfdP9tA2/exec';
+    localStorage.setItem("SIMPRO_GAS_URL", API_URL);
     closeModal("apiModal");
     fetchAllData();
   };
 
-  // Fetch Data from Google Sheets
-  window.fetchAllData = async function() {
-    const icon = document.getElementById("refreshIcon");
-    if (icon) icon.classList.add("fa-spin");
-
+  // --- DATA FETCH & SYNC ---
+  async function fetchAllData() {
     if (API_URL) {
       try {
         const res = await fetch(`${API_URL}?action=getAllData`);
         const json = await res.json();
-        if (json.status === "success") {
-          appData = json.data;
-          const badge = document.getElementById("connectionBadge");
-          if (badge) {
-            badge.className = "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Terhubung Google Sheets`;
-          }
-        }
-      } catch (e) {
-        console.error("Gagal mengambil data dari Google Sheets:", e);
-      }
+        if (json.status === "success") appData = json.data;
+      } catch (e) { console.error(e); }
     }
     renderAll();
-    if (icon) icon.classList.remove("fa-spin");
+  }
+
+  async function postAdminAction(payload) {
+    payload.adminPassword = adminSessionPass;
+    if (!API_URL) return { status: "success" };
+    const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+    return await res.json();
+  }
+
+  // --- RENDER ALL VIEWS ---
+  function renderAll() {
+    renderCompanyProfile();
+    renderServices();
+    renderDashboard();
+    renderWBS();
+    renderAHSP();
+    renderOrders();
+    renderCashFlow();
+    renderDailyReports();
+  }
+
+  function renderCompanyProfile() {
+    const s = appData.PublicSettings || {};
+    const name = s.Company_Name || "PT. KARYA KONSTRUKSI NUSANTARA";
+    const addr = s.Company_Address || "Jl. Kaliurang Km 5.5, Sleman, DI Yogyakarta";
+    const wa = s.Admin_WA || "6281234567890";
+
+    document.getElementById("brandCompanyName").innerText = name;
+    document.getElementById("brandCompanyAddress").innerText = addr;
+    document.getElementById("sidebarWaText").innerText = "+" + wa;
+    document.getElementById("sidebarWaLink").href = `https://wa.me/${wa}`;
+
+    // Kop Surat Print PDF
+    document.getElementById("printCompanyName").innerText = name;
+    document.getElementById("printCompanyAddress").innerText = addr;
+    document.getElementById("printCompanyWA").innerText = wa;
+    document.getElementById("printSignCompany").innerText = name;
+    document.getElementById("printDate").innerText = new Date().toLocaleDateString("id-ID", { dateStyle: "long" });
+
+    // Form Settings Admin
+    document.getElementById("setCompanyName").value = name;
+    document.getElementById("setCompanyAddress").value = addr;
+    document.getElementById("setAdminWA").value = wa;
+  }
+
+  function renderServices() {
+    const grid = document.getElementById("servicesGrid");
+    grid.innerHTML = "";
+    (appData.Services || []).forEach(srv => {
+      grid.innerHTML += `
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition">
+          <div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="bg-sky-100 text-sky-800 text-[11px] font-bold px-2.5 py-1 rounded-md">${srv.Category}</span>
+              <div class="admin-flex hidden gap-1.5">
+                <button onclick="openEditService('${srv.Service_ID}')" class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="deleteService('${srv.Service_ID}')" class="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded hover:bg-rose-200" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </div>
+            <h3 class="font-bold text-lg text-slate-900 mt-3">${srv.Service_Name}</h3>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">${srv.Description}</p>
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-slate-100">
+            <p class="text-[11px] text-slate-400">Estimasi Harga Satuan</p>
+            <p class="text-xl font-bold text-slate-900">${formatIDR(srv.Price)} <span class="text-xs font-normal text-slate-500">/ ${srv.Unit}</span></p>
+            <button onclick="openOrderModal('${srv.Service_ID}')" class="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+              <i class="fa-brands fa-whatsapp text-base"></i> Pesan Sekarang
+            </button>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // --- PEMESANAN PELANGGAN (PUBLIK) ---
+  window.openOrderModal = function(srvId) {
+    const srv = appData.Services.find(s => s.Service_ID === srvId);
+    if (!srv) return;
+    document.getElementById("orderServiceId").value = srv.Service_ID;
+    document.getElementById("orderServiceTitle").innerText = srv.Service_Name;
+    document.getElementById("orderUnitPrice").value = srv.Price;
+    document.getElementById("orderUnitLabel").innerText = srv.Unit;
+    document.getElementById("orderVolume").value = 1;
+    calcOrderTotal();
+    openModal("orderModal");
   };
 
-  async function postToBackend(payload) {
-    if (!API_URL) return true;
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify(payload)
+  window.calcOrderTotal = function() {
+    const price = Number(document.getElementById("orderUnitPrice").value) || 0;
+    const vol = Number(document.getElementById("orderVolume").value) || 1;
+    document.getElementById("orderTotalDisplay").value = formatIDR(price * vol);
+  };
+
+  window.submitCustomerOrder = async function(e) {
+    e.preventDefault();
+    const srvName = document.getElementById("orderServiceTitle").innerText;
+    const custName = document.getElementById("orderCustName").value;
+    const custWA = document.getElementById("orderCustWA").value;
+    const vol = Number(document.getElementById("orderVolume").value);
+    const total = Number(document.getElementById("orderUnitPrice").value) * vol;
+    const orderId = "ORD-" + Math.floor(100 + Math.random() * 900);
+
+    const newOrder = {
+      Order_ID: orderId,
+      Order_Date: new Date().toISOString().split("T")[0],
+      Customer_Name: custName,
+      Customer_WA: custWA,
+      Service_Name: srvName,
+      Volume: vol,
+      Total_Price: total,
+      Status: "Pending"
+    };
+
+    if (API_URL) {
+      fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "createOrder", data: newOrder }) });
+    }
+    appData.Orders.push(newOrder);
+    closeModal("orderModal");
+    renderOrders();
+
+    // Redirect ke WhatsApp Admin Perusahaan
+    const adminWA = (appData.PublicSettings && appData.PublicSettings.Admin_WA) || "6281234567890";
+    const text = `Halo Admin *${appData.PublicSettings.Company_Name}*, saya ingin memesan layanan:\n\n` +
+                 `• No. Order: *${orderId}*\n` +
+                 `• Nama: *${custName}*\n` +
+                 `• Layanan: *${srvName}*\n` +
+                 `• Volume: *${vol}*\n` +
+                 `• Estimasi Total: *${formatIDR(total)}*\n\nMohon konfirmasi jadwal survei/pengerjaan. Terima kasih.`;
+    window.open(`https://wa.me/${adminWA}?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  // --- CRUD LAYANAN (ADMIN) ---
+  window.openServiceModal = function() {
+    document.getElementById("serviceModalHeading").innerText = "Tambah Layanan Baru";
+    document.getElementById("srvEditId").value = "";
+    document.getElementById("srvName").value = "";
+    document.getElementById("srvCat").value = "";
+    document.getElementById("srvUnit").value = "";
+    document.getElementById("srvPrice").value = "";
+    document.getElementById("srvDesc").value = "";
+    openModal("serviceModal");
+  };
+
+  window.openEditService = function(id) {
+    const srv = appData.Services.find(s => s.Service_ID === id);
+    if (!srv) return;
+    document.getElementById("serviceModalHeading").innerText = "Edit Layanan & Harga";
+    document.getElementById("srvEditId").value = srv.Service_ID;
+    document.getElementById("srvName").value = srv.Service_Name;
+    document.getElementById("srvCat").value = srv.Category;
+    document.getElementById("srvUnit").value = srv.Unit;
+    document.getElementById("srvPrice").value = srv.Price;
+    document.getElementById("srvDesc").value = srv.Description;
+    openModal("serviceModal");
+  };
+
+  window.saveService = async function(e) {
+    e.preventDefault();
+    const editId = document.getElementById("srvEditId").value;
+    const obj = {
+      Service_ID: editId || ("SRV-" + Math.floor(10 + Math.random() * 90)),
+      Service_Name: document.getElementById("srvName").value,
+      Category: document.getElementById("srvCat").value,
+      Unit: document.getElementById("srvUnit").value,
+      Price: Number(document.getElementById("srvPrice").value),
+      Description: document.getElementById("srvDesc").value
+    };
+
+    if (editId) {
+      await postAdminAction({ action: "updateRow", sheet: "Services", id: editId, data: obj });
+      const idx = appData.Services.findIndex(s => s.Service_ID === editId);
+      if (idx !== -1) appData.Services[idx] = obj;
+    } else {
+      await postAdminAction({ action: "addRow", sheet: "Services", data: obj });
+      appData.Services.push(obj);
+    }
+    closeModal("serviceModal");
+    renderServices();
+  };
+
+  window.deleteService = async function(id) {
+    if (!confirm("Hapus layanan ini?")) return;
+    await postAdminAction({ action: "deleteRow", sheet: "Services", id });
+    appData.Services = appData.Services.filter(s => s.Service_ID !== id);
+    renderServices();
+  };
+
+  // --- KONFIRMASI PESANAN & ARUS KAS (ADMIN) ---
+  function renderOrders() {
+    const tbody = document.getElementById("ordersTableBody");
+    tbody.innerHTML = "";
+    (appData.Orders || []).slice().reverse().forEach(o => {
+      const isConfirmed = o.Status === "Confirmed";
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-bold">${o.Order_ID}</td>
+          <td class="p-3">${o.Order_Date}</td>
+          <td class="p-3">
+            <div class="font-semibold">${o.Customer_Name}</div>
+            <div class="text-xs text-slate-500">${o.Customer_WA}</div>
+          </td>
+          <td class="p-3">${o.Service_Name}</td>
+          <td class="p-3 text-center">${o.Volume}</td>
+          <td class="p-3 text-right font-bold">${formatIDR(o.Total_Price)}</td>
+          <td class="p-3 text-center">
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${o.Status}</span>
+          </td>
+          <td class="p-3 text-center">
+            ${!isConfirmed ? `<button onclick="confirmOrder('${o.Order_ID}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Konfirmasi & Masuk Kas</button>` : '<span class="text-xs text-slate-400">Selesai</span>'}
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  window.confirmOrder = async function(orderId) {
+    await postAdminAction({ action: "confirmOrder", orderId });
+    const ord = appData.Orders.find(o => o.Order_ID === orderId);
+    if (ord) {
+      ord.Status = "Confirmed";
+      appData.CashFlow.push({
+        Tx_ID: "TX-" + Math.floor(100 + Math.random() * 900),
+        Date: new Date().toISOString().split("T")[0],
+        Type: "Pemasukan",
+        Category: "Pesanan Layanan",
+        Description: `Konfirmasi Pesanan ${ord.Order_ID} - ${ord.Customer_Name}`,
+        Amount: Number(ord.Total_Price)
       });
-      return await res.json();
-    } catch (e) {
-      console.error("POST Error:", e);
-      return null;
     }
+    renderOrders();
+    renderCashFlow();
+  };
+
+  function renderCashFlow() {
+    const tbody = document.getElementById("cashFlowTableBody");
+    tbody.innerHTML = "";
+    let totalIn = 0, totalOut = 0;
+
+    (appData.CashFlow || []).forEach(tx => {
+      const amt = Number(tx.Amount) || 0;
+      const isIn = tx.Type === "Pemasukan";
+      if (isIn) totalIn += amt; else totalOut += amt;
+
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3">${tx.Date}</td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded text-xs font-bold ${isIn ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${tx.Type}</span>
+          </td>
+          <td class="p-3">${tx.Category}</td>
+          <td class="p-3 font-medium">${tx.Description}</td>
+          <td class="p-3 text-right font-bold ${isIn ? 'text-emerald-700' : 'text-rose-700'}">${isIn ? '+' : '-'} ${formatIDR(amt)}</td>
+          <td class="p-3 text-center no-print">
+            <button onclick="deleteCashFlow('${tx.Tx_ID}')" class="text-rose-600 hover:underline text-xs"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+
+    document.getElementById("cfTotalIn").innerText = formatIDR(totalIn);
+    document.getElementById("cfTotalOut").innerText = formatIDR(totalOut);
+    document.getElementById("cfBalance").innerText = formatIDR(totalIn - totalOut);
   }
 
-  function renderAll() {
-    try {
-      renderDashboardAndEVM();
-      renderWBSAndGantt();
-      renderCostAndAHSP();
-      renderFieldAndCCO();
-      renderResources();
-      renderDocuments();
-      renderQCHSE();
-    } catch (err) {
-      console.error("Render Error:", err);
-    }
-  }
+  window.submitCashFlow = async function(e) {
+    e.preventDefault();
+    const tx = {
+      Tx_ID: "TX-" + Math.floor(100 + Math.random() * 900),
+      Date: document.getElementById("cfDate").value,
+      Type: document.getElementById("cfType").value,
+      Category: document.getElementById("cfCategory").value,
+      Description: document.getElementById("cfDesc").value,
+      Amount: Number(document.getElementById("cfAmount").value)
+    };
+    await postAdminAction({ action: "addRow", sheet: "CashFlow", data: tx });
+    appData.CashFlow.push(tx);
+    closeModal("modalCashFlow");
+    renderCashFlow();
+  };
 
-  function renderDashboardAndEVM() {
+  window.deleteCashFlow = async function(id) {
+    if (!confirm("Hapus transaksi kas ini?")) return;
+    await postAdminAction({ action: "deleteRow", sheet: "CashFlow", id });
+    appData.CashFlow = appData.CashFlow.filter(t => t.Tx_ID !== id);
+    renderCashFlow();
+  };
+
+  // --- PENGATURAN PERUSAHAAN & PASSWORD ADMIN ---
+  window.saveCompanySettings = async function(e) {
+    e.preventDefault();
+    const updates = {
+      Company_Name: document.getElementById("setCompanyName").value.trim(),
+      Company_Address: document.getElementById("setCompanyAddress").value.trim(),
+      Admin_WA: document.getElementById("setAdminWA").value.trim()
+    };
+    await postAdminAction({ action: "updateSettings", settings: updates });
+    appData.PublicSettings = updates;
+    renderCompanyProfile();
+    alert("Profil perusahaan dan nomor WhatsApp berhasil diperbarui!");
+  };
+
+  window.changeAdminPassword = async function(e) {
+    e.preventDefault();
+    const oldP = document.getElementById("oldPassword").value;
+    const newP = document.getElementById("newPassword").value;
+    const confP = document.getElementById("confirmNewPassword").value;
+
+    if (oldP !== adminSessionPass) return alert("Password lama tidak sesuai!");
+    if (newP !== confP) return alert("Konfirmasi password baru tidak cocok!");
+
+    await postAdminAction({ action: "updateSettings", settings: { New_Password: newP } });
+    adminSessionPass = newP;
+    localFallbackPass = newP;
+    sessionStorage.setItem("SIMPRO_ADMIN_PASS", newP);
+    localStorage.setItem("SIMPRO_LOCAL_PASS", newP);
+
+    document.getElementById("oldPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("confirmNewPassword").value = "";
+    alert("Password Admin berhasil diganti!");
+  };
+
+  // --- DASHBOARD, WBS, AHSP & LAPORAN HARIAN ---
+  function renderDashboard() {
     const tasks = appData.WBS_Tasks || [];
     let totalBudget = 0, earnedValue = 0, actualCost = 0, weightedProgress = 0;
 
@@ -871,473 +1110,169 @@
       const ac = Number(t.Actual_Cost) || 0;
       const prog = Number(t.Progress_Pct) || 0;
       const weight = Number(t.Weight_Pct) || 0;
-
       totalBudget += b;
       earnedValue += b * (prog / 100);
       actualCost += ac;
       weightedProgress += weight * (prog / 100);
     });
 
-    const plannedProgress = 62.0;
-    const plannedValue = totalBudget * (plannedProgress / 100);
+    const plannedValue = totalBudget * 0.62;
     const cpi = actualCost > 0 ? (earnedValue / actualCost) : 1;
     const spi = plannedValue > 0 ? (earnedValue / plannedValue) : 1;
-    const cv = earnedValue - actualCost;
 
-    const elProg = document.getElementById("kpiProgress");
-    if (elProg) elProg.innerText = weightedProgress.toFixed(1) + "%";
+    document.getElementById("kpiProgress").innerText = weightedProgress.toFixed(1) + "%";
+    document.getElementById("kpiCPI").innerText = cpi.toFixed(2);
+    document.getElementById("kpiSPI").innerText = spi.toFixed(2);
 
-    const elPlanProg = document.getElementById("kpiPlanProgress");
-    if (elPlanProg) elPlanProg.innerText = `Rencana Kumulatif: ${plannedProgress.toFixed(1)}%`;
-    
-    const cpiEl = document.getElementById("kpiCPI");
-    if (cpiEl) {
-      cpiEl.innerText = cpi.toFixed(2);
-      cpiEl.className = `text-2xl font-bold mt-1 ${cpi >= 1 ? 'text-emerald-600' : 'text-rose-600'}`;
-    }
-
-    const spiEl = document.getElementById("kpiSPI");
-    if (spiEl) {
-      spiEl.innerText = spi.toFixed(2);
-      spiEl.className = `text-2xl font-bold mt-1 ${spi >= 1 ? 'text-indigo-600' : 'text-amber-600'}`;
-    }
-
-    const evmPV = document.getElementById("evmPV");
-    if (evmPV) evmPV.innerText = formatIDR(plannedValue);
-    
-    const evmEV = document.getElementById("evmEV");
-    if (evmEV) evmEV.innerText = formatIDR(earnedValue);
-    
-    const evmAC = document.getElementById("evmAC");
-    if (evmAC) evmAC.innerText = formatIDR(actualCost);
-    
-    const cvEl = document.getElementById("evmCV");
-    if (cvEl) {
-      cvEl.innerText = (cv >= 0 ? "+" : "") + formatIDR(cv);
-      cvEl.className = `text-lg font-bold mt-1 ${cv >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-    }
-
-    // Render Kurva-S Chart
     const canvasS = document.getElementById("scurveChartDash");
     if (canvasS) {
-      const ctxS = canvasS.getContext("2d");
       if (scurveChartInstance) scurveChartInstance.destroy();
-      scurveChartInstance = new Chart(ctxS, {
+      scurveChartInstance = new Chart(canvasS.getContext("2d"), {
         type: "line",
         data: {
-          labels: ["Bulan 1", "Bulan 2", "Bulan 3", "Bulan 4 (Saat Ini)", "Bulan 5", "Bulan 6"],
+          labels: ["Bulan 1", "Bulan 2", "Bulan 3", "Bulan 4", "Bulan 5", "Bulan 6"],
           datasets: [
-            {
-              label: "Rencana Kumulatif (%)",
-              data: [5, 22, 42, 62, 85, 100],
-              borderColor: "#94a3b8",
-              borderDash: [5, 5],
-              tension: 0.35,
-              fill: false
-            },
-            {
-              label: "Realisasi Aktual (%)",
-              data: [5, 24, 45, Number(weightedProgress.toFixed(1)), null, null],
-              borderColor: "#0284c7",
-              backgroundColor: "rgba(2, 132, 199, 0.12)",
-              borderWidth: 3,
-              tension: 0.35,
-              fill: true
-            }
+            { label: "Rencana (%)", data: [5, 22, 42, 62, 85, 100], borderColor: "#94a3b8", borderDash: [5, 5], tension: 0.35 },
+            { label: "Aktual (%)", data: [5, 24, 45, Number(weightedProgress.toFixed(1)), null, null], borderColor: "#0284c7", backgroundColor: "rgba(2, 132, 199, 0.1)", borderWidth: 3, tension: 0.35, fill: true }
           ]
         },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { max: 100, beginAtZero: true } } }
       });
     }
-
-    // Render Cost Chart
-    const canvasC = document.getElementById("costChartDash");
-    if (canvasC) {
-      const ctxC = canvasC.getContext("2d");
-      if (costChartInstance) costChartInstance.destroy();
-      costChartInstance = new Chart(ctxC, {
-        type: "bar",
-        data: {
-          labels: ["Planned (PV)", "Earned (EV)", "Actual (AC)"],
-          datasets: [{
-            label: "Nilai (Miliar Rp)",
-            data: [plannedValue / 1e9, earnedValue / 1e9, actualCost / 1e9],
-            backgroundColor: ["#64748b", "#10b981", "#f59e0b"],
-            borderRadius: 6
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
-    }
   }
 
-  function renderWBSAndGantt() {
-    const tasks = appData.WBS_Tasks || [];
+  function renderWBS() {
     const tbody = document.getElementById("wbsTableBody");
-    const gantt = document.getElementById("ganttContainer");
     const select = document.getElementById("dailyTaskSelect");
-
-    if (tbody) tbody.innerHTML = "";
-    if (gantt) gantt.innerHTML = "";
+    tbody.innerHTML = "";
     if (select) select.innerHTML = "";
 
-    tasks.forEach((t, idx) => {
-      const isCrit = t.Is_Critical === "Yes";
-      if (tbody) {
-        tbody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${t.WBS_Code}</td>
-            <td class="p-3 font-medium text-slate-900">${t.Task_Name}</td>
-            <td class="p-3">${t.Duration_Days} hari</td>
-            <td class="p-3 text-slate-500">${t.Predecessor_ID}</td>
-            <td class="p-3">
-              <span class="px-2 py-0.5 rounded text-xs font-semibold ${isCrit ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}">
-                ${isCrit ? 'CRITICAL' : 'Float'}
-              </span>
-            </td>
-            <td class="p-3 text-right">${t.Weight_Pct}%</td>
-            <td class="p-3 text-right font-bold text-sky-600">${t.Progress_Pct}%</td>
-            <td class="p-3 text-right">${formatIDR(t.Budget_Cost)}</td>
-          </tr>
-        `;
-      }
-
-      if (gantt) {
-        const leftOffset = idx * 12;
-        const widthPct = Math.min(100 - leftOffset, Math.max(18, (Number(t.Duration_Days) / 180) * 100));
-        gantt.innerHTML += `
-          <div class="grid grid-cols-12 items-center gap-3 text-xs">
-            <div class="col-span-4 truncate font-medium text-slate-700" title="${t.Task_Name}">${t.WBS_Code} ${t.Task_Name}</div>
-            <div class="col-span-8 bg-slate-100 rounded-full h-6 relative overflow-hidden p-0.5">
-              <div style="margin-left: ${leftOffset}%; width: ${widthPct}%;" class="h-full rounded-full ${isCrit ? 'bg-rose-500' : 'bg-sky-500'} flex items-center justify-end pr-2 text-[10px] text-white font-bold gantt-bar">
-                ${t.Progress_Pct}%
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      if (select) {
-        select.innerHTML += `<option value="${t.Task_ID}">${t.WBS_Code} - ${t.Task_Name} (Saat ini: ${t.Progress_Pct}%)</option>`;
-      }
+    (appData.WBS_Tasks || []).forEach(t => {
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-bold">${t.WBS_Code}</td>
+          <td class="p-3 font-medium">${t.Task_Name}</td>
+          <td class="p-3">${t.Duration_Days} hari</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-bold ${t.Is_Critical === 'Yes' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}">${t.Is_Critical === 'Yes' ? 'Kritis' : 'Normal'}</span></td>
+          <td class="p-3 text-right">${t.Weight_Pct}%</td>
+          <td class="p-3 text-right font-bold text-sky-600">${t.Progress_Pct}%</td>
+          <td class="p-3 text-right">${formatIDR(t.Budget_Cost)}</td>
+          <td class="p-3 text-center admin-cell hidden">
+            <button onclick="deleteWBS('${t.Task_ID}')" class="text-rose-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+      if (select) select.innerHTML += `<option value="${t.Task_ID}">${t.WBS_Code} - ${t.Task_Name}</option>`;
     });
   }
 
-  function renderCostAndAHSP() {
-    const rabBody = document.getElementById("rabTableBody");
-    if (rabBody) {
-      rabBody.innerHTML = "";
-      (appData.RAB_BOQ || []).forEach(r => {
-        const over = Number(r.Actual_Spent) > Number(r.Total_Budget);
-        rabBody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${r.RAB_ID}</td>
-            <td class="p-3">${r.Item_Description}</td>
-            <td class="p-3">${r.Unit}</td>
-            <td class="p-3 text-right">${Number(r.Volume).toLocaleString()}</td>
-            <td class="p-3 text-right">${formatIDR(r.Unit_Price)}</td>
-            <td class="p-3 text-right font-semibold">${formatIDR(r.Total_Budget)}</td>
-            <td class="p-3 text-right ${over ? 'text-rose-600 font-bold' : 'text-emerald-600'}">${formatIDR(r.Actual_Spent)}</td>
-            <td class="p-3 text-center">
-              <span class="px-2 py-0.5 rounded text-xs font-semibold ${over ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">
-                ${over ? 'Overrun' : 'Aman'}
-              </span>
-            </td>
-          </tr>
-        `;
-      });
-    }
-
-    const ahspBody = document.getElementById("ahspTableBody");
-    if (ahspBody) {
-      ahspBody.innerHTML = "";
-      (appData.AHSP_Catalog || []).forEach(a => {
-        ahspBody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${a.AHSP_ID}</td>
-            <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">${a.Work_Category}</span></td>
-            <td class="p-3 font-medium">${a.Work_Name}</td>
-            <td class="p-3">${a.Unit}</td>
-            <td class="p-3 text-right">${formatIDR(a.Material_Cost)}</td>
-            <td class="p-3 text-right">${formatIDR(a.Labor_Cost)}</td>
-            <td class="p-3 text-right">${formatIDR(a.Equipment_Cost)}</td>
-            <td class="p-3 text-right font-bold text-slate-900">${formatIDR(a.Unit_Price)}</td>
-          </tr>
-        `;
-      });
-    }
-  }
-
-  function renderFieldAndCCO() {
-    const ccoBody = document.getElementById("ccoTableBody");
-    if (ccoBody) {
-      ccoBody.innerHTML = "";
-      (appData.Change_Orders || []).forEach(c => {
-        ccoBody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${c.CO_ID}</td>
-            <td class="p-3 font-medium">${c.Title}</td>
-            <td class="p-3">${c.Type}</td>
-            <td class="p-3 text-right font-semibold ${c.Type === 'Addition' ? 'text-amber-600' : 'text-emerald-600'}">${formatIDR(c.Cost_Impact)}</td>
-            <td class="p-3 text-center">+${c.Time_Impact_Days} Hari</td>
-            <td class="p-3 text-center">
-              <span class="px-2 py-0.5 rounded text-xs font-semibold ${c.Status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${c.Status}</span>
-            </td>
-            <td class="p-3 text-center">
-              ${c.Status !== 'Approved' ? `<button onclick="approveCCO('${c.CO_ID}')" class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded hover:bg-emerald-500">Approve</button>` : '-'}
-            </td>
-          </tr>
-        `;
-      });
-    }
-
-    const dailyList = document.getElementById("dailyReportsList");
-    if (dailyList) {
-      dailyList.innerHTML = "";
-      (appData.Daily_Reports || []).slice().reverse().forEach(d => {
-        dailyList.innerHTML += `
-          <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-2">
-            <div class="flex justify-between items-center text-xs text-slate-500">
-              <span class="font-bold text-slate-800">${d.Date} • Paket ${d.Task_ID}</span>
-              <span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-medium"><i class="fa-solid fa-cloud-sun"></i> ${d.Weather}</span>
-            </div>
-            <p class="text-sm text-slate-700">${d.Notes}</p>
-            <div class="flex justify-between items-center pt-2 border-t border-slate-200 text-xs text-slate-500">
-              <span><i class="fa-solid fa-users"></i> ${d.Workers_Count} Pekerja • Oleh: ${d.Reported_By}</span>
-              ${d.Photo_URL ? `<a href="${d.Photo_URL}" target="_blank" class="text-sky-600 font-semibold hover:underline"><i class="fa-solid fa-image"></i> Lihat Foto Drive</a>` : '<span class="italic">Tanpa lampiran foto</span>'}
-            </div>
-          </div>
-        `;
-      });
-    }
-  }
-
-  function renderResources() {
-    const tbody = document.getElementById("equipTableBody");
-    if (tbody) {
-      tbody.innerHTML = "";
-      (appData.Resources_Equip || []).forEach(e => {
-        const badge = e.Status === "Operating" ? "bg-emerald-100 text-emerald-700" : (e.Status === "Maintenance" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700");
-        tbody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${e.Equip_ID}</td>
-            <td class="p-3 font-medium">${e.Equipment_Name}</td>
-            <td class="p-3">${e.Category}</td>
-            <td class="p-3">${e.Allocated_Task}</td>
-            <td class="p-3">${e.Next_Maintenance}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-semibold ${badge}">${e.Status}</span></td>
-          </tr>
-        `;
-      });
-    }
-  }
-
-  function renderDocuments() {
-    const tbody = document.getElementById("docTableBody");
-    if (tbody) {
-      tbody.innerHTML = "";
-      (appData.Documents || []).forEach(doc => {
-        tbody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${doc.Doc_ID}</td>
-            <td class="p-3">${doc.Doc_Type}</td>
-            <td class="p-3 font-medium">${doc.Title}</td>
-            <td class="p-3"><span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-xs font-semibold">${doc.Version}</span></td>
-            <td class="p-3">${doc.Status}</td>
-            <td class="p-3"><a href="${doc.File_URL}" target="_blank" class="text-sky-600 hover:underline font-semibold text-xs"><i class="fa-solid fa-arrow-up-right-from-square"></i> Buka File</a></td>
-          </tr>
-        `;
-      });
-    }
-  }
-
-  function renderQCHSE() {
-    const tbody = document.getElementById("qchseTableBody");
-    if (tbody) {
-      tbody.innerHTML = "";
-      (appData.QC_HSE_Logs || []).forEach(q => {
-        tbody.innerHTML += `
-          <tr class="hover:bg-slate-50">
-            <td class="p-3">${q.Date}</td>
-            <td class="p-3 font-semibold">${q.Category}</td>
-            <td class="p-3 font-medium">${q.Title}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">${q.Result_Status}</span></td>
-            <td class="p-3 text-center font-bold">${q.APD_Compliance_Pct}%</td>
-            <td class="p-3">${q.Inspector}</td>
-            <td class="p-3 text-slate-500 text-xs">${q.Remarks}</td>
-          </tr>
-        `;
-      });
-    }
-  }
-
-  // Form Submissions & Actions
-  window.submitDailyReport = async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById("btnSubmitDaily");
-    if (btn) { btn.innerText = "Mengunggah..."; btn.disabled = true; }
-
-    const taskId = document.getElementById("dailyTaskSelect").value;
-    const newPct = Number(document.getElementById("dailyNewPct").value);
-    const addedCost = Number(document.getElementById("dailyCost").value);
-    const fileInput = document.getElementById("dailyPhoto");
-
-    let imageBase64 = null, imageName = null;
-    if (fileInput && fileInput.files.length > 0) {
-      const file = fileInput.files[0];
-      imageName = `PROGRES_${Date.now()}_${file.name}`;
-      imageBase64 = await toBase64(file);
-    }
-
-    const newReport = {
-      Report_ID: "REP-" + Math.floor(100 + Math.random() * 900),
-      Project_ID: "PRJ-001",
-      Date: document.getElementById("dailyDate").value,
-      Task_ID: taskId,
-      Weather: document.getElementById("dailyWeather").value,
-      Workers_Count: document.getElementById("dailyWorkers").value,
-      Volume_Done: "-",
-      Notes: document.getElementById("dailyNotes").value,
-      Photo_URL: "",
-      Reported_By: "Site Engineer",
-      New_Progress_Pct: newPct,
-      Added_Cost: addedCost
-    };
-
-    await postToBackend({ action: "addRow", sheet: "Daily_Reports", data: newReport, imageBase64, imageName });
-
-    appData.Daily_Reports.push(newReport);
-    const task = appData.WBS_Tasks.find(t => t.Task_ID === taskId);
-    if (task) {
-      task.Progress_Pct = newPct;
-      task.Actual_Cost = Number(task.Actual_Cost) + addedCost;
-    }
-
-    if (btn) { btn.innerText = "Kirim Laporan"; btn.disabled = false; }
-    closeModal("modalDaily");
-    renderAll();
-  };
-
-  window.submitCCO = async function(e) {
-    e.preventDefault();
-    const newCCO = {
-      CO_ID: "CCO-" + Math.floor(100 + Math.random() * 900),
-      Project_ID: "PRJ-001",
-      Title: document.getElementById("ccoTitle").value,
-      Type: document.getElementById("ccoType").value,
-      Cost_Impact: Number(document.getElementById("ccoCost").value),
-      Time_Impact_Days: Number(document.getElementById("ccoDays").value),
-      Status: "Pending Approval",
-      Request_Date: new Date().toISOString().split("T")[0]
-    };
-    await postToBackend({ action: "addRow", sheet: "Change_Orders", data: newCCO });
-    appData.Change_Orders.push(newCCO);
-    closeModal("modalCCO");
-    renderAll();
-  };
-
-  window.approveCCO = async function(coId) {
-    await postToBackend({ action: "updateCOStatus", coId, status: "Approved" });
-    const cco = appData.Change_Orders.find(c => c.CO_ID === coId);
-    if (cco) cco.Status = "Approved";
-    renderAll();
-  };
-
   window.submitWBS = async function(e) {
     e.preventDefault();
-    const s = document.getElementById("wbsStart").value;
-    const end = document.getElementById("wbsEnd").value;
-    const days = Math.max(1, Math.round((new Date(end) - new Date(s)) / (1000 * 60 * 60 * 24)));
     const newTask = {
       Task_ID: "TSK-" + Math.floor(10 + Math.random() * 90),
       Project_ID: "PRJ-001",
       WBS_Code: document.getElementById("wbsCode").value,
       Task_Name: document.getElementById("wbsName").value,
-      Start_Date: s,
-      End_Date: end,
-      Duration_Days: days,
-      Predecessor_ID: "-",
-      Is_Critical: document.getElementById("wbsCritical").value,
+      Duration_Days: 30,
+      Is_Critical: "Yes",
       Weight_Pct: Number(document.getElementById("wbsWeight").value),
       Progress_Pct: 0,
       Budget_Cost: Number(document.getElementById("wbsBudget").value),
       Actual_Cost: 0
     };
-    await postToBackend({ action: "addRow", sheet: "WBS_Tasks", data: newTask });
+    await postAdminAction({ action: "addRow", sheet: "WBS_Tasks", data: newTask });
     appData.WBS_Tasks.push(newTask);
     closeModal("modalWBS");
     renderAll();
   };
 
+  window.deleteWBS = async function(id) {
+    if (!confirm("Hapus item WBS ini?")) return;
+    await postAdminAction({ action: "deleteRow", sheet: "WBS_Tasks", id });
+    appData.WBS_Tasks = appData.WBS_Tasks.filter(t => t.Task_ID !== id);
+    renderAll();
+  };
+
+  function renderAHSP() {
+    const tbody = document.getElementById("ahspTableBody");
+    tbody.innerHTML = "";
+    (appData.AHSP_Catalog || []).forEach(a => {
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-bold">${a.AHSP_ID}</td>
+          <td class="p-3">${a.Work_Category}</td>
+          <td class="p-3 font-medium">${a.Work_Name}</td>
+          <td class="p-3">${a.Unit}</td>
+          <td class="p-3 text-right font-bold">${formatIDR(a.Unit_Price)}</td>
+          <td class="p-3 text-center admin-cell hidden">
+            <button onclick="deleteAHSP('${a.AHSP_ID}')" class="text-rose-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
   window.submitAHSP = async function(e) {
     e.preventDefault();
-    const mat = Number(document.getElementById("ahspMat").value);
-    const lab = Number(document.getElementById("ahspLab").value);
-    const eqp = Number(document.getElementById("ahspEqp").value);
-    const newItem = {
+    const item = {
       AHSP_ID: "AHSP-" + Math.floor(10 + Math.random() * 90),
       Work_Category: document.getElementById("ahspCat").value,
       Work_Name: document.getElementById("ahspName").value,
       Unit: document.getElementById("ahspUnit").value,
-      Material_Cost: mat,
-      Labor_Cost: lab,
-      Equipment_Cost: eqp,
-      Unit_Price: mat + lab + eqp
+      Unit_Price: Number(document.getElementById("ahspPrice").value)
     };
-    await postToBackend({ action: "addRow", sheet: "AHSP_Catalog", data: newItem });
-    appData.AHSP_Catalog.push(newItem);
+    await postAdminAction({ action: "addRow", sheet: "AHSP_Catalog", data: item });
+    appData.AHSP_Catalog.push(item);
     closeModal("modalAHSP");
-    renderAll();
+    renderAHSP();
   };
 
-  window.submitDoc = async function(e) {
-    e.preventDefault();
-    const newDoc = {
-      Doc_ID: "DOC-" + Math.floor(100 + Math.random() * 900),
-      Project_ID: "PRJ-001",
-      Doc_Type: document.getElementById("docType").value,
-      Title: document.getElementById("docTitle").value,
-      Version: document.getElementById("docVer").value,
-      File_URL: document.getElementById("docUrl").value,
-      Uploaded_Date: new Date().toISOString().split("T")[0],
-      Status: "Approved for Construction"
-    };
-    await postToBackend({ action: "addRow", sheet: "Documents", data: newDoc });
-    appData.Documents.push(newDoc);
-    closeModal("modalDoc");
-    renderAll();
+  window.deleteAHSP = async function(id) {
+    if (!confirm("Hapus item AHSP ini?")) return;
+    await postAdminAction({ action: "deleteRow", sheet: "AHSP_Catalog", id });
+    appData.AHSP_Catalog = appData.AHSP_Catalog.filter(a => a.AHSP_ID !== id);
+    renderAHSP();
   };
 
-  window.submitQCHSE = async function(e) {
+  function renderDailyReports() {
+    const list = document.getElementById("dailyReportsList");
+    list.innerHTML = "";
+    (appData.Daily_Reports || []).slice().reverse().forEach(d => {
+      list.innerHTML += `
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-bold text-sky-600">${d.Date} • Paket ${d.Task_ID}</div>
+          <p class="text-sm text-slate-700 mt-1">${d.Notes}</p>
+        </div>
+      `;
+    });
+  }
+
+  window.submitDailyReport = async function(e) {
     e.preventDefault();
-    const newLog = {
-      Log_ID: "LOG-" + Math.floor(100 + Math.random() * 900),
+    const taskId = document.getElementById("dailyTaskSelect").value;
+    const newPct = Number(document.getElementById("dailyNewPct").value);
+    const addedCost = Number(document.getElementById("dailyCost").value);
+    const rep = {
+      Report_ID: "REP-" + Math.floor(100 + Math.random() * 900),
       Project_ID: "PRJ-001",
-      Category: document.getElementById("qcCategory").value,
       Date: new Date().toISOString().split("T")[0],
-      Title: document.getElementById("qcTitle").value,
-      Result_Status: document.getElementById("qcStatus").value,
-      APD_Compliance_Pct: Number(document.getElementById("qcApd").value),
-      Inspector: document.getElementById("qcInspector").value,
-      Remarks: document.getElementById("qcRemarks").value
+      Task_ID: taskId,
+      Notes: document.getElementById("dailyNotes").value,
+      New_Progress_Pct: newPct,
+      Added_Cost: addedCost
     };
-    await postToBackend({ action: "addRow", sheet: "QC_HSE_Logs", data: newLog });
-    appData.QC_HSE_Logs.push(newLog);
-    closeModal("modalQCHSE");
+    await postAdminAction({ action: "addRow", sheet: "Daily_Reports", data: rep });
+    appData.Daily_Reports.push(rep);
+    const t = appData.WBS_Tasks.find(x => x.Task_ID === taskId);
+    if (t) { t.Progress_Pct = newPct; t.Actual_Cost = Number(t.Actual_Cost) + addedCost; }
+    closeModal("modalDaily");
     renderAll();
   };
 
-  const toBase64 = file => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-  });
-
-  // Safe Initialization on DOM Load
   document.addEventListener("DOMContentLoaded", () => {
-    const dateInput = document.getElementById("dailyDate");
-    if (dateInput) dateInput.valueAsDate = new Date();
+    const cfDate = document.getElementById("cfDate");
+    if (cfDate) cfDate.valueAsDate = new Date();
+    applyRoleState();
     fetchAllData();
   });
 </script>
