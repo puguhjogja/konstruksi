@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JAYA-ABADI-JOGJA: Sistem Manajemen Proyek Konstruksi</title>
+<title>SIMPLE-KON: Sistem Manajemen Proyek Konstruksi</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif}
@@ -17,6 +17,8 @@ body{background:#f0f4f8;color:#1e293b}
 .form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#334155}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;transition:.2s;font-family:inherit}
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.form-group input:disabled,.form-group select:disabled{background:#f1f5f9;cursor:not-allowed}
+.form-group small{font-size:11px;color:#64748b;display:block;margin-top:4px}
 .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px;justify-content:center}
 .btn-primary{background:var(--primary);color:#fff;width:100%}
 .btn-primary:hover{background:var(--primary-light)}
@@ -94,6 +96,7 @@ tr:hover td{background:#f8fafc}
 .spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .menu-toggle{display:none;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px}
+.lock-icon{font-size:32px;margin-bottom:8px}
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;transition:.3s;z-index:99}
 .sidebar.show{left:0}
@@ -110,7 +113,7 @@ tr:hover td{background:#f8fafc}
 
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
-    <h1>🏗️ JAYA-ABADI-JOGJA</h1>
+    <h1>🏗️ SIMPLE-KON</h1>
     <p>Sistem Manajemen Proyek Konstruksi</p>
     <div id="loginAlert"></div>
     <div class="form-group">
@@ -122,7 +125,7 @@ tr:hover td{background:#f8fafc}
       <input type="password" id="loginPass" placeholder="Masukkan password" autocomplete="current-password">
     </div>
     <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">🔐 Login</button>
-    <p style="margin-top:20px;font-size:11px;color:#94a3b8;text-align:center">Dibuat Oleh:Tri Puguh Santoso</p>
+    <p style="margin-top:20px;font-size:11px;color:#94a3b8;text-align:center">Default: admin / admin123</p>
   </div>
 </div>
 
@@ -130,7 +133,7 @@ tr:hover td{background:#f8fafc}
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:12px">
       <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('show')">☰</button>
-      <div class="logo">🏗️ JAYA-ABADI-JOGJA <span class="logo-badge">v1.0</span></div>
+      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.0</span></div>
     </div>
     <div class="user-info">
       <div class="avatar" id="userAvatar">A</div>
@@ -160,7 +163,7 @@ tr:hover td{background:#f8fafc}
       <div class="nav-item" data-page="hse">🦺 K3 / HSE</div>
       <div class="nav-item" data-page="documents">📁 Dokumen</div>
       <div class="nav-section">ADMIN</div>
-      <div class="nav-item" data-page="users">👥 Manajemen User</div>
+      <div class="nav-item" data-page="users" id="navUsers">👥 Manajemen User</div>
       <div class="nav-item" data-page="settings">⚙️ Pengaturan</div>
       <div class="nav-item" data-page="password">🔑 Ganti Password</div>
     </div>
@@ -297,8 +300,8 @@ tr:hover td{background:#f8fafc}
 
       <div class="page" id="page-users">
         <div class="page-header">
-          <div><h2>Manajemen User</h2><p>Kelola akses & hak pengguna</p></div>
-          <button class="btn btn-primary btn-sm" onclick="openUserModal()">➕ Tambah User</button>
+          <div><h2>Manajemen User</h2><p>Kelola akses & hak pengguna (khusus administrator)</p></div>
+          <button class="btn btn-primary btn-sm" id="btnAddUser" onclick="openUserModal()">➕ Tambah User</button>
         </div>
         <div class="card"><div class="table-wrapper"><table id="usersTable"></table></div></div>
       </div>
@@ -342,10 +345,10 @@ tr:hover td{background:#f8fafc}
 
 <script>
 // ==================================================================
-// KONFIGURASI - ISI URL WEB APP ANDA DI SINI
-// Kosongkan jika hanya dibuka via Web App Apps Script (mode GAS)
+// ⚠️ KONFIGURASI WAJIB
+// Ganti dengan URL Web App Apps Script Anda (akhiri dengan /exec)
 // ==================================================================
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwAOLRlWDPks_6pKL92x-4ak-Mw3qzOBr2pNS52Z2qzuah--DEXnqchy6IQzwz2ZKnf/exec';  // contoh: 'https://script.google.com/macros/s/AKfyc.../exec'
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxxOMU8HcCR9_u0IktgfJV29Zlakm5yoVfQWFIWcxjlV5hVtspzYU9p8R9a4gTqzrKS/exec';
 
 // ==================================================================
 // STATE
@@ -356,9 +359,10 @@ let currentPage = 'dashboard';
 let cashflowChartInstance = null;
 let scurveChartInstance = null;
 let settingsCache = {};
+let usersCache = [];
 
 // ==================================================================
-// API WRAPPER (Hybrid: GAS mode + Fetch mode)
+// API WRAPPER (Hybrid: GAS + Fetch)
 // ==================================================================
 function api(action, data) {
   return new Promise((resolve) => {
@@ -371,12 +375,11 @@ function api(action, data) {
       resolve(result);
     };
     const timeoutId = setTimeout(
-      () => done({ success: false, message: 'Timeout: server tidak merespons (45s). Periksa deployment.' }),
+      () => done({ success: false, message: 'Timeout: server tidak merespons (45s).' }),
       45000
     );
 
     const inGAS = (typeof google !== 'undefined' && google.script && google.script.run);
-
     if (inGAS) {
       try {
         google.script.run
@@ -405,7 +408,7 @@ function api(action, data) {
       clearTimeout(timeoutId);
       done({
         success: false,
-        message: 'Koneksi ke server gagal. Buka via Web App URL Apps Script, atau isi WEB_APP_URL di index.html.'
+        message: 'WEB_APP_URL belum diisi di index.html. Isi dengan URL Web App Apps Script Anda (akhiri dengan /exec).'
       });
       return;
     }
@@ -420,22 +423,18 @@ function api(action, data) {
       .then(r => r.text())
       .then(text => {
         clearTimeout(timeoutId);
-        try {
-          const result = JSON.parse(text);
-          done(result || { success: false, message: 'Respons kosong' });
-        } catch (err) {
-          done({ success: false, message: 'Respons bukan JSON. Pastikan deployment "Anyone".' });
-        }
+        try { done(JSON.parse(text) || { success: false, message: 'Respons kosong' }); }
+        catch (err) { done({ success: false, message: 'Respons bukan JSON. Pastikan deployment Web App = Anyone.' }); }
       })
       .catch(err => {
         clearTimeout(timeoutId);
-        done({ success: false, message: 'Fetch error: ' + err.message });
+        done({ success: false, message: 'Fetch error: ' + err.message + '. Pastikan deployment Web App = Anyone.' });
       });
   });
 }
 
 // ==================================================================
-// LOADING / TOAST / UTIL
+// UTIL
 // ==================================================================
 function showLoading(show) {
   const el = document.getElementById('loading');
@@ -464,9 +463,7 @@ function fmtNum(n) {
   return isNaN(num) ? '0' : num.toLocaleString('id-ID');
 }
 
-function today() {
-  return new Date().toISOString().split('T')[0];
-}
+function today() { return new Date().toISOString().split('T')[0]; }
 
 function val(id) {
   const el = document.getElementById(id);
@@ -477,6 +474,11 @@ function esc(str) {
   return String(str == null ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function roleLabel(role) {
+  const map = { admin: 'Administrator', manager: 'Project Manager', supervisor: 'Site Supervisor', viewer: 'Viewer' };
+  return map[role] || role || 'User';
 }
 
 // ==================================================================
@@ -522,23 +524,33 @@ async function initApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').classList.add('active');
   document.getElementById('userName').textContent = currentUser.nama || 'User';
-  document.getElementById('userRole').textContent = currentUser.role || 'User';
+  document.getElementById('userRole').textContent = roleLabel(currentUser.role);
   document.getElementById('userAvatar').textContent = String(currentUser.nama || 'U').charAt(0).toUpperCase();
+
+  const navUsers = document.getElementById('navUsers');
+  if (navUsers) navUsers.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+
   document.querySelectorAll('.nav-item').forEach(el => {
     if (!el.dataset._bound) {
       el.dataset._bound = '1';
       el.addEventListener('click', () => navigate(el.dataset.page));
     }
   });
+
   try {
     const s = await api('getSettings', {});
     settingsCache = (s && s.data) || {};
   } catch (e) { settingsCache = {}; }
+
   await loadProjects();
   navigate('dashboard');
 }
 
 function navigate(page) {
+  if (page === 'users' && currentUser.role !== 'admin') {
+    toast('Akses ditolak. Hanya administrator.', 'error');
+    return;
+  }
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('page-' + page);
@@ -649,10 +661,8 @@ async function saveProject(id) {
   if (!data.kode || !data.nama) { toast('Kode & nama wajib', 'error'); return; }
   const res = await api('saveProject', data);
   if (res && res.success) {
-    toast('Proyek tersimpan', 'success');
-    closeModal();
-    await loadProjects();
-    loadProjectsPage();
+    toast('Proyek tersimpan', 'success'); closeModal();
+    await loadProjects(); loadProjectsPage();
   } else toast((res && res.message) || 'Gagal', 'error');
 }
 
@@ -661,8 +671,7 @@ async function delProject(id) {
   const res = await api('deleteProject', { id: id });
   if (res && res.success) {
     toast('Proyek dihapus', 'success');
-    await loadProjects();
-    loadProjectsPage();
+    await loadProjects(); loadProjectsPage();
   } else toast((res && res.message) || 'Gagal', 'error');
 }
 
@@ -1233,57 +1242,153 @@ async function saveDocument() {
 }
 
 // ==================================================================
-// USERS
+// USERS - KHUSUS ADMINISTRATOR
 // ==================================================================
 async function loadUsers() {
   const t = document.getElementById('usersTable');
-  if (currentUser.role !== 'admin') {
-    t.innerHTML = '<tr><td><div class="empty">Akses ditolak. Hanya admin.</div></td></tr>';
+  const btn = document.getElementById('btnAddUser');
+
+  if (!currentUser || currentUser.role !== 'admin') {
+    t.innerHTML = '<tr><td><div class="empty"><div class="lock-icon">🔒</div>Akses ditolak.<br>Hanya administrator yang dapat mengelola user.</div></td></tr>';
+    if (btn) btn.style.display = 'none';
     return;
   }
-  const res = await api('getUsers', {});
-  const list = (res && res.data) || [];
+  if (btn) btn.style.display = 'inline-flex';
+
+  const res = await api('getUsers', { adminId: currentUser.id });
+
+  if (!res || !res.success) {
+    t.innerHTML = '<tr><td><div class="empty">' + esc((res && res.message) || 'Gagal memuat user') + '</div></td></tr>';
+    return;
+  }
+
+  usersCache = res.data || [];
+
   t.innerHTML = '<thead><tr><th>Username</th><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>' +
-    list.map(u =>
-      '<tr><td><b>' + esc(u.username) + '</b></td><td>' + esc(u.nama) + '</td><td>' + esc(u.email) + '</td>' +
+    usersCache.map(u => {
+      const isSelf = u.id === currentUser.id;
+      const isMainAdmin = u.username === 'admin';
+      const cannotDelete = isSelf || isMainAdmin;
+      const aktif = (u.aktif === true || String(u.aktif) === 'true');
+
+      return '<tr>' +
+        '<td><b>' + esc(u.username) + '</b>' + (isSelf ? ' <span class="badge badge-info">Anda</span>' : '') + '</td>' +
+        '<td>' + esc(u.nama) + '</td>' +
+        '<td>' + esc(u.email || '-') + '</td>' +
         '<td><span class="badge badge-info">' + esc(u.role) + '</span></td>' +
-        '<td><span class="badge ' + (u.aktif ? 'badge-success' : 'badge-gray') + '">' + (u.aktif ? 'Aktif' : 'Nonaktif') + '</span></td>' +
-        '<td><button class="btn btn-sm btn-danger" onclick="delUser(\'' + esc(u.id) + '\')">🗑️</button></td></tr>'
-    ).join('') + '</tbody>';
+        '<td><span class="badge ' + (aktif ? 'badge-success' : 'badge-gray') + '">' + (aktif ? 'Aktif' : 'Nonaktif') + '</span></td>' +
+        '<td>' +
+          '<button class="btn btn-sm btn-outline" onclick="editUser(\'' + esc(u.id) + '\')" title="Edit user">✏️</button> ' +
+          '<button class="btn btn-sm btn-danger" onclick="delUser(\'' + esc(u.id) + '\')" ' +
+            (cannotDelete ? 'disabled title="Tidak dapat dihapus"' : 'title="Hapus user"') + '>🗑️</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
 }
 
-function openUserModal() {
-  document.getElementById('modalTitle').textContent = 'Tambah User';
-  document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Username *</label><input id="uUsername"></div>' +
-      '<div class="form-group"><label>Password *</label><input type="password" id="uPassword"></div>' +
+function openUserModal(data) {
+  if (!currentUser || currentUser.role !== 'admin') {
+    toast('Akses ditolak. Hanya administrator.', 'error');
+    return;
+  }
+  const u = data || {};
+  const isEdit = !!data;
+  const isMainAdmin = u.username === 'admin';
+
+  document.getElementById('modalTitle').textContent = isEdit ? '✏️ Edit User' : '➕ Tambah User';
+
+  let html = '';
+  html += '<div class="form-row">' +
+    '<div class="form-group"><label>Username *</label>' +
+      '<input id="uUsername" value="' + esc(u.username || '') + '" ' +
+      (isMainAdmin ? 'readonly' : '') + '>' +
+      (isMainAdmin ? '<small>Username admin utama tidak dapat diubah</small>' : '') +
     '</div>' +
-    '<div class="form-group"><label>Nama Lengkap *</label><input id="uNama"></div>' +
-    '<div class="form-group"><label>Email</label><input type="email" id="uEmail"></div>' +
-    '<div class="form-group"><label>Role</label><select id="uRole"><option>admin</option><option>manager</option><option>supervisor</option><option>viewer</option></select></div>';
+    '<div class="form-group"><label>Password ' + (isEdit ? '(opsional)' : '*') + '</label>' +
+      '<input type="password" id="uPassword" placeholder="' + (isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 4 karakter') + '">' +
+    '</div>' +
+  '</div>';
+
+  html += '<div class="form-group"><label>Nama Lengkap *</label>' +
+    '<input id="uNama" value="' + esc(u.nama || '') + '"></div>';
+  html += '<div class="form-group"><label>Email</label>' +
+    '<input type="email" id="uEmail" value="' + esc(u.email || '') + '"></div>';
+
+  html += '<div class="form-group"><label>Role</label>' +
+    '<select id="uRole" ' + (isMainAdmin ? 'disabled' : '') + '>' +
+      '<option ' + (u.role === 'admin' ? 'selected' : '') + '>admin</option>' +
+      '<option ' + (u.role === 'manager' ? 'selected' : '') + '>manager</option>' +
+      '<option ' + (u.role === 'supervisor' ? 'selected' : '') + '>supervisor</option>' +
+      '<option ' + (u.role === 'viewer' ? 'selected' : '') + '>viewer</option>' +
+    '</select>' +
+    (isMainAdmin ? '<small>Role admin utama tidak dapat diubah</small>' : '') +
+  '</div>';
+
+  if (isEdit) {
+    const aktif = (u.aktif === true || String(u.aktif) === 'true');
+    html += '<div class="form-group"><label>Status</label>' +
+      '<select id="uAktif">' +
+        '<option value="true" ' + (aktif ? 'selected' : '') + '>Aktif</option>' +
+        '<option value="false" ' + (!aktif ? 'selected' : '') + '>Nonaktif</option>' +
+      '</select></div>';
+  }
+
+  document.getElementById('modalBody').innerHTML = html;
+
   document.getElementById('modalFooter').innerHTML =
     '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
-    '<button class="btn btn-primary" style="width:auto" onclick="saveUser()">💾 Simpan</button>';
+    '<button class="btn btn-primary" style="width:auto" onclick="saveUser(\'' + esc(u.id || '') + '\')">💾 Simpan</button>';
+
   document.getElementById('modalOverlay').classList.add('active');
 }
 
-async function saveUser() {
+function editUser(id) {
+  const u = usersCache.find(x => x.id === id);
+  if (u) openUserModal(u);
+  else toast('User tidak ditemukan. Muat ulang halaman.', 'error');
+}
+
+async function saveUser(id) {
+  if (!currentUser || currentUser.role !== 'admin') {
+    toast('Akses ditolak. Hanya administrator.', 'error');
+    return;
+  }
   const data = {
-    username: val('uUsername'), password: val('uPassword'),
-    nama: val('uNama'), email: val('uEmail'), role: val('uRole'), aktif: true
+    adminId: currentUser.id,
+    id: id || '',
+    username: val('uUsername'),
+    password: val('uPassword'),
+    nama: val('uNama'),
+    email: val('uEmail'),
+    role: val('uRole'),
+    aktif: document.getElementById('uAktif') ? (val('uAktif') === 'true') : true
   };
-  if (!data.username || !data.password || !data.nama) { toast('Lengkapi data', 'error'); return; }
+  if (!data.username || !data.nama) { toast('Username & nama wajib diisi', 'error'); return; }
+  if (!id && !data.password) { toast('Password wajib diisi untuk user baru', 'error'); return; }
+  if (data.password && data.password.length < 4) { toast('Password minimal 4 karakter', 'error'); return; }
+
   const res = await api('saveUser', data);
-  if (res && res.success) { toast('User tersimpan', 'success'); closeModal(); loadUsers(); }
-  else toast((res && res.message) || 'Gagal', 'error');
+  if (res && res.success) {
+    toast(res.message || (id ? 'User diperbarui' : 'User ditambahkan'), 'success');
+    closeModal();
+    loadUsers();
+  } else toast((res && res.message) || 'Gagal menyimpan user', 'error');
 }
 
 async function delUser(id) {
-  if (!confirm('Hapus user?')) return;
-  const res = await api('deleteUser', { id: id });
-  if (res && res.success) { toast('Terhapus', 'success'); loadUsers(); }
-  else toast((res && res.message) || 'Gagal', 'error');
+  if (!currentUser || currentUser.role !== 'admin') {
+    toast('Akses ditolak. Hanya administrator.', 'error');
+    return;
+  }
+  if (id === currentUser.id) { toast('Anda tidak dapat menghapus akun sendiri', 'error'); return; }
+  const u = usersCache.find(x => x.id === id);
+  const label = u ? 'user "' + u.username + '"' : 'user ini';
+  if (!confirm('Hapus ' + label + '?\n\nTindakan ini tidak dapat dibatalkan.')) return;
+  const res = await api('deleteUser', { adminId: currentUser.id, id: id });
+  if (res && res.success) {
+    toast(res.message || 'User berhasil dihapus', 'success');
+    loadUsers();
+  } else toast((res && res.message) || 'Gagal menghapus user', 'error');
 }
 
 // ==================================================================
