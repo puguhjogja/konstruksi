@@ -18,7 +18,7 @@
 .nav button{width:100%;border:0;background:transparent;color:#c4d1dc;text-align:left;padding:10px 12px;border-radius:9px;margin:2px 0;display:flex;align-items:center;gap:12px;font-weight:550;font-size:13px}
 .nav button:hover,.nav button.active{background:#ffffff16;color:#fff}
 .nav button.active{box-shadow:inset 3px 0 var(--gold)}
-.nav button.locked{opacity:.45}
+.nav button.locked{opacity:.55}
 .ico{width:20px;text-align:center;font-size:15px}
 .sidefoot{margin-top:auto;padding:15px 10px 5px;color:#9fb2c1;font-size:10px;border-top:1px solid #ffffff20;line-height:1.6}
 .sidefoot b{color:#e8ad45;font-weight:700}
@@ -116,7 +116,6 @@ tbody tr:hover{background:#fafcfe}
 .loginbox .field{margin-bottom:14px}
 .loginbox .btn{width:100%;justify-content:center;padding:11px;font-size:13px}
 .loginfoot{text-align:center;font-size:11px;color:var(--muted);margin-top:18px}
-.loginfoot a{color:var(--blue);font-weight:700;text-decoration:none;cursor:pointer}
 .loginerr{background:#fff0ef;color:#c44943;border:1px solid #f1c0bd;border-radius:8px;padding:9px 11px;font-size:11px;margin-bottom:14px;display:none}
 .loginerr.show{display:block}
 @media(max-width:1000px){.sidebar{width:215px}.main{margin-left:215px}.stats{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}}
@@ -126,7 +125,7 @@ tbody tr:hover{background:#fafcfe}
 </head>
 <body>
 
-<!-- LOGIN MODAL (hanya muncul saat klik login) -->
+<!-- LOGIN MODAL -->
 <div class="loginpage" id="loginPage">
  <div class="loginbox">
   <div class="loginbrand">
@@ -191,34 +190,48 @@ tbody tr:hover{background:#fafcfe}
 
 <script>
 /* ==========================================================
-   KONFIGURASI: ganti dengan URL Web App Google Apps Script Anda
-   Contoh: https://script.google.com/macros/s/XXXXX/exec
+   KONFIGURASI — GANTI dengan URL Web App Google Apps Script Anda
    ========================================================== */
-const API_BASE = 'https://script.google.com/macros/s/AKfycbw2EC3BUtzvniPIMCneeovOUS3330oFGax6Z1n7V4anQzfzqN8m36aRGt7I8Q1zw5mO/exec';
+const API_BASE = 'https://script.google.com/macros/s/AKfycbxlQnVD2RU-g3WaOy0po6jZMcbUywdfiOmiIoOhJhfu5EkGSnqmBNOhiHK7aQaYq-fv/exec';
 
 let TOKEN = localStorage.getItem('puguhToken') || '';
 function authHeaders(extra = {}) {
   return { ...extra, ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) };
 }
 
-/* Apps Script tidak mendukung preflight OPTIONS; gunakan text/plain + redirect follow */
+/* ============ API CLIENT (method override untuk Apps Script) ============ */
 async function api(path, opts = {}) {
-  const url = API_BASE + (path.startsWith('?') ? path : '?path=' + encodeURIComponent(path));
-  const res = await fetch(url, {
-    method: opts.method || 'GET',
-    redirect: 'follow',
-    headers: authHeaders({ 'Content-Type': 'text/plain;charset=utf-8' }),
-    body: opts.body
-  });
+  const method = (opts.method || 'GET').toUpperCase();
+  let urlPath = path;
+  let fetchOpts = { method: 'GET', redirect: 'follow', headers: authHeaders() };
+
+  if (method === 'GET') {
+    urlPath = path + (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
+  } else if (method === 'POST') {
+    fetchOpts.method = 'POST';
+    fetchOpts.headers = authHeaders({ 'Content-Type': 'text/plain;charset=utf-8' });
+    fetchOpts.body = opts.body || '{}';
+  } else {
+    // PUT / DELETE → POST + _method override
+    urlPath = path + (path.includes('?') ? '&' : '?') + '_method=' + method;
+    fetchOpts.method = 'POST';
+    fetchOpts.headers = authHeaders({ 'Content-Type': 'text/plain;charset=utf-8' });
+    fetchOpts.body = opts.body || '{}';
+  }
+
+  const url = API_BASE + '?path=' + encodeURIComponent(urlPath);
+  const res = await fetch(url, fetchOpts);
   const text = await res.text();
   let data = null;
-  try { data = JSON.parse(text); } catch (e) { throw new Error('Respons server tidak valid: ' + text.slice(0,120)); }
+  try { data = JSON.parse(text); }
+  catch (e) { throw new Error('Respons server tidak valid: ' + text.slice(0, 200)); }
+
   if (res.status === 401 || data.error === 'Unauthorized') {
     localStorage.removeItem('puguhToken'); TOKEN = '';
     session = null; saveSession(); updateUIForSession();
     throw new Error('Sesi berakhir. Silakan login kembali.');
   }
-  if (!res.ok || data.error) throw new Error(data.error || 'API error ' + res.status);
+  if (data.error) throw new Error(data.error);
   return data;
 }
 
@@ -272,10 +285,7 @@ function statusTag(s){let cl=(s==='Selesai'||s==='Disetujui'||s==='Aktif')?'gree
 /* ================== LOGIN ================== */
 function openLogin(){ $('#loginPage').classList.add('show'); setTimeout(()=>$('#loginEmail').focus(),50); }
 function closeLogin(){ $('#loginPage').classList.remove('show'); $('#loginErr').classList.remove('show'); }
-function onAvatarClick(){
-  if(isLoggedIn()) openProfile();
-  else openLogin();
-}
+function onAvatarClick(){ if(isLoggedIn()) openProfile(); else openLogin(); }
 async function doLogin(){
   const email=$('#loginEmail').value.trim();
   const pass=$('#loginPass').value;
@@ -295,6 +305,7 @@ function showLoginErr(msg){const e=$('#loginErr');e.textContent=msg;e.classList.
 
 async function logout(){
   if(!confirm('Yakin ingin keluar dari sistem?'))return;
+  try{ await api('auth/logout',{method:'POST'}); }catch(e){}
   TOKEN=''; localStorage.removeItem('puguhToken');
   session=null;saveSession();
   try{ await loadAll(); }catch(e){}
@@ -328,8 +339,7 @@ function updateUIForSession(){
  rp.style.background= role==='Tamu'?'#fff5e5':'#eef7f5';
  rp.style.color= role==='Tamu'?'#a96d12':'#16836e';
  document.querySelectorAll('.nav button[data-need]').forEach(b=>{
-   const ok=!!p[b.dataset.need];
-   b.classList.toggle('locked',!ok);
+   b.classList.toggle('locked',!p[b.dataset.need]);
  });
  applyCompany();
 }
@@ -341,9 +351,6 @@ function head(title,desc,buttons=''){return `<div class="pagehead"><div><h1>${ti
 function stat(label,value,note,icon){return `<div class="stat"><div class="stathead">${label}<span class="staticon">${icon}</span></div><strong>${value}</strong><small>${note}</small></div>`}
 
 function render(){
- if(!session){ // guest session
-   session=null;
- }
  updateUIForSession();
  let titles={dashboard:'Dashboard',projects:'Daftar Proyek',schedule:'WBS & Penjadwalan',cost:'RAB & AHSP',field:'Laporan Lapangan',documents:'Dokumen & Approval',issues:'Isu & Tindak Lanjut',company:'Pengaturan Perusahaan',team:'Tim & Hak Akses',admin:'Menu Admin',backup:'Backup & Restore Data'};
  let subs={dashboard:'Ringkasan operasional proyek Anda',company:'Ubah identitas perusahaan',admin:'Pusat administrasi sistem',team:'Kelola personel dan hak akses',backup:'Cadangkan atau pulihkan data'};
@@ -588,14 +595,10 @@ function applyCompany(){
 }
 function printPDF(){if(page==='dashboard'||page==='field')drawCurve();setTimeout(()=>window.print(),150)}
 function setPage(p){
- if((p==='admin'&&!can('admin'))||(p==='backup'&&!can('backup'))||(p==='company'&&!can('companyEdit'))){
-   page=p;
-   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
-   $('#sidebar').classList.remove('open');
-   render();
-   return;
- }
- page=p;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#sidebar').classList.remove('open');render()
+ page=p;
+ document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
+ $('#sidebar').classList.remove('open');
+ render();
 }
 function modal(title,html,fn){$('#modalTitle').textContent=title;$('#modalBody').innerHTML=html;$('#modalSave').onclick=async()=>{if(await fn())closeModal()};$('#modalSave').textContent='Simpan Data';$('#modal').classList.add('show')}
 function closeModal(){$('#modal').classList.remove('show')}
