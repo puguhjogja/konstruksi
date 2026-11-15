@@ -75,6 +75,7 @@ tr:hover td{background:#f8fafc}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.active{display:flex}
 .modal{background:#fff;border-radius:12px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,.4)}
+.modal.wide{max-width:900px}
 .modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
 .modal-header h3{font-size:17px}
 .modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:var(--gray);line-height:1}
@@ -97,6 +98,12 @@ tr:hover td{background:#f8fafc}
 @keyframes spin{to{transform:rotate(360deg)}}
 .menu-toggle{display:none;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px}
 .lock-icon{font-size:32px;margin-bottom:8px}
+.perm-table{width:100%;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px}
+.perm-table th{background:#f1f5f9;padding:8px;font-size:11px}
+.perm-table td{padding:6px 8px;text-align:center}
+.perm-table td:first-child{text-align:left;font-weight:600}
+.perm-table input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:#1e40af}
+.perm-role-title{font-size:14px;font-weight:700;color:#1e40af;margin:16px 0 8px;text-transform:capitalize}
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;transition:.3s;z-index:99}
 .sidebar.show{left:0}
@@ -133,7 +140,7 @@ tr:hover td{background:#f8fafc}
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:12px">
       <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('show')">☰</button>
-      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.0</span></div>
+      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.1</span></div>
     </div>
     <div class="user-info">
       <div class="avatar" id="userAvatar">A</div>
@@ -301,7 +308,10 @@ tr:hover td{background:#f8fafc}
       <div class="page" id="page-users">
         <div class="page-header">
           <div><h2>Manajemen User</h2><p>Kelola akses & hak pengguna (khusus administrator)</p></div>
-          <button class="btn btn-primary btn-sm" id="btnAddUser" onclick="openUserModal()">➕ Tambah User</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="openPermissionsModal()">🔐 Hak Akses Role</button>
+            <button class="btn btn-primary btn-sm" id="btnAddUser" onclick="openUserModal()">➕ Tambah User</button>
+          </div>
         </div>
         <div class="card"><div class="table-wrapper"><table id="usersTable"></table></div></div>
       </div>
@@ -334,7 +344,7 @@ tr:hover td{background:#f8fafc}
 </div>
 
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
+  <div class="modal" id="modalBox">
     <div class="modal-header"><h3 id="modalTitle">Form</h3><button class="modal-close" onclick="closeModal()">×</button></div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer" id="modalFooter"></div>
@@ -345,24 +355,31 @@ tr:hover td{background:#f8fafc}
 
 <script>
 // ==================================================================
-// ⚠️ KONFIGURASI WAJIB
-// Ganti dengan URL Web App Apps Script Anda (akhiri dengan /exec)
+// ⚠️ KONFIGURASI WAJIB: Ganti dengan URL Web App Apps Script Anda
 // ==================================================================
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxxOMU8HcCR9_u0IktgfJV29Zlakm5yoVfQWFIWcxjlV5hVtspzYU9p8R9a4gTqzrKS/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx8lKYkmOta9A3Qe6mWAIdYt8snzgceB5ATMlisPIlNOqaHghFncziUXZfqUHW5fqJT/exec';
 
 // ==================================================================
 // STATE
 // ==================================================================
 let currentUser = null;
 let currentProjects = [];
+let currentPermissions = {};
 let currentPage = 'dashboard';
 let cashflowChartInstance = null;
 let scurveChartInstance = null;
 let settingsCache = {};
 let usersCache = [];
 
+const PAGE_TO_MODULE = {
+  dashboard: 'projects', projects: 'projects', wbs: 'wbs', budget: 'budget',
+  finance: 'finance', evm: 'evm', reports: 'reports', changes: 'changes',
+  resources: 'resources', qc: 'qc', hse: 'hse', documents: 'documents',
+  users: 'users', settings: 'settings', password: 'password'
+};
+
 // ==================================================================
-// API WRAPPER (Hybrid: GAS + Fetch)
+// API
 // ==================================================================
 function api(action, data) {
   return new Promise((resolve) => {
@@ -374,10 +391,7 @@ function api(action, data) {
       showLoading(false);
       resolve(result);
     };
-    const timeoutId = setTimeout(
-      () => done({ success: false, message: 'Timeout: server tidak merespons (45s).' }),
-      45000
-    );
+    const timeoutId = setTimeout(() => done({ success: false, message: 'Timeout 45s. Periksa deployment.' }), 45000);
 
     const inGAS = (typeof google !== 'undefined' && google.script && google.script.run);
     if (inGAS) {
@@ -389,14 +403,14 @@ function api(action, data) {
               const result = typeof response === 'string' ? JSON.parse(response) : response;
               done(result || { success: false, message: 'Respons kosong' });
             } catch (err) {
-              done({ success: false, message: 'Format respons tidak valid: ' + err.message });
+              done({ success: false, message: 'Respons tidak valid: ' + err.message });
             }
           })
           .withFailureHandler((error) => {
             clearTimeout(timeoutId);
             done({ success: false, message: 'Server error: ' + (error && error.message ? error.message : String(error)) });
           })
-          .serverCall(JSON.stringify({ action: action, data: data || {} }));
+          .serverCall(JSON.stringify({ action, data: data || {} }));
       } catch (err) {
         clearTimeout(timeoutId);
         done({ success: false, message: 'Exception: ' + err.message });
@@ -406,29 +420,24 @@ function api(action, data) {
 
     if (!WEB_APP_URL || WEB_APP_URL.indexOf('script.google.com') === -1) {
       clearTimeout(timeoutId);
-      done({
-        success: false,
-        message: 'WEB_APP_URL belum diisi di index.html. Isi dengan URL Web App Apps Script Anda (akhiri dengan /exec).'
-      });
+      done({ success: false, message: 'WEB_APP_URL belum diisi di index.html. Ganti dengan URL /exec Anda.' });
       return;
     }
 
     fetch(WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      redirect: 'follow',
+      method: 'POST', mode: 'cors', redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action, data: data || {} })
+      body: JSON.stringify({ action, data: data || {} })
     })
       .then(r => r.text())
       .then(text => {
         clearTimeout(timeoutId);
         try { done(JSON.parse(text) || { success: false, message: 'Respons kosong' }); }
-        catch (err) { done({ success: false, message: 'Respons bukan JSON. Pastikan deployment Web App = Anyone.' }); }
+        catch (err) { done({ success: false, message: 'Respons bukan JSON. Pastikan deployment = Anyone.' }); }
       })
       .catch(err => {
         clearTimeout(timeoutId);
-        done({ success: false, message: 'Fetch error: ' + err.message + '. Pastikan deployment Web App = Anyone.' });
+        done({ success: false, message: 'Fetch error: ' + err.message + '. Pastikan deployment = Anyone.' });
       });
   });
 }
@@ -457,28 +466,46 @@ function fmtRp(n) {
   if (isNaN(num)) return 'Rp 0';
   return 'Rp ' + num.toLocaleString('id-ID');
 }
-
-function fmtNum(n) {
-  const num = Number(n || 0);
-  return isNaN(num) ? '0' : num.toLocaleString('id-ID');
-}
-
+function fmtNum(n) { const num = Number(n || 0); return isNaN(num) ? '0' : num.toLocaleString('id-ID'); }
 function today() { return new Date().toISOString().split('T')[0]; }
-
-function val(id) {
-  const el = document.getElementById(id);
-  return el ? String(el.value || '').trim() : '';
-}
-
+function val(id) { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
 function esc(str) {
   return String(str == null ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
 function roleLabel(role) {
   const map = { admin: 'Administrator', manager: 'Project Manager', supervisor: 'Site Supervisor', viewer: 'Viewer' };
   return map[role] || role || 'User';
+}
+
+// ==================================================================
+// RBAC HELPERS
+// ==================================================================
+function can(module, action) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+  const m = currentPermissions[module];
+  if (!m) return false;
+  return m['can_' + action] === true;
+}
+
+function applyRBACToSidebar() {
+  document.querySelectorAll('.nav-item').forEach(nav => {
+    const page = nav.dataset.page;
+    if (page === 'password' || page === 'dashboard') { nav.style.display = 'flex'; return; }
+    if (page === 'users' || page === 'settings') {
+      nav.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+      return;
+    }
+    const module = PAGE_TO_MODULE[page];
+    nav.style.display = can(module, 'view') ? 'flex' : 'none';
+  });
+}
+
+function toggleCreateButton(pageSelector, module) {
+  const btn = document.querySelector(pageSelector);
+  if (btn) btn.style.display = can(module, 'create') ? 'inline-flex' : 'none';
 }
 
 // ==================================================================
@@ -497,10 +524,12 @@ async function doLogin() {
   btn.disabled = true;
   btn.textContent = '⏳ Memproses...';
   try {
-    const res = await api('login', { username: username, password: password });
+    const res = await api('login', { username, password });
     if (res && res.success && res.user) {
       currentUser = res.user;
       localStorage.setItem('sk_user', JSON.stringify(currentUser));
+      const permRes = await api('getMyPermissions', { role: currentUser.role });
+      currentPermissions = (permRes && permRes.success) ? permRes.data : {};
       await initApp();
     } else {
       alertBox.innerHTML = '<div class="alert alert-error">' + esc((res && res.message) || 'Login gagal') + '</div>';
@@ -516,6 +545,7 @@ async function doLogin() {
 function logout() {
   if (!confirm('Yakin ingin logout?')) return;
   currentUser = null;
+  currentPermissions = {};
   localStorage.removeItem('sk_user');
   location.reload();
 }
@@ -527,8 +557,10 @@ async function initApp() {
   document.getElementById('userRole').textContent = roleLabel(currentUser.role);
   document.getElementById('userAvatar').textContent = String(currentUser.nama || 'U').charAt(0).toUpperCase();
 
-  const navUsers = document.getElementById('navUsers');
-  if (navUsers) navUsers.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  if (!currentPermissions || !Object.keys(currentPermissions).length) {
+    const permRes = await api('getMyPermissions', { role: currentUser.role });
+    currentPermissions = (permRes && permRes.success) ? permRes.data : {};
+  }
 
   document.querySelectorAll('.nav-item').forEach(el => {
     if (!el.dataset._bound) {
@@ -536,6 +568,8 @@ async function initApp() {
       el.addEventListener('click', () => navigate(el.dataset.page));
     }
   });
+
+  applyRBACToSidebar();
 
   try {
     const s = await api('getSettings', {});
@@ -548,9 +582,16 @@ async function initApp() {
 
 function navigate(page) {
   if (page === 'users' && currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error');
-    return;
+    toast('Akses ditolak. Hanya administrator.', 'error'); return;
   }
+  if (page === 'settings' && currentUser.role !== 'admin') {
+    toast('Akses ditolak. Hanya administrator.', 'error'); return;
+  }
+  const module = PAGE_TO_MODULE[page];
+  if (page !== 'password' && page !== 'dashboard' && module && !can(module, 'view')) {
+    toast('Akses ditolak. Role Anda tidak memiliki izin.', 'error'); return;
+  }
+
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('page-' + page);
@@ -558,6 +599,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   const sidebar = document.querySelector('.sidebar');
   if (sidebar) sidebar.classList.remove('show');
+
   const loaders = {
     dashboard: loadDashboard, projects: loadProjectsPage, wbs: loadWBS,
     budget: loadBudget, finance: loadFinance, evm: loadEVM,
@@ -587,11 +629,11 @@ async function loadProjects() {
 }
 
 async function loadProjectsPage() {
+  toggleCreateButton('#page-projects .btn-primary', 'projects');
   const t = document.getElementById('projectsTable');
-  if (!currentProjects.length) {
-    t.innerHTML = '<tr><td><div class="empty">Belum ada proyek. Klik "Proyek Baru" untuk memulai.</div></td></tr>';
-    return;
-  }
+  if (!currentProjects.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada proyek.</div></td></tr>'; return; }
+  const canEdit = can('projects','edit');
+  const canDel = can('projects','delete');
   t.innerHTML = '<thead><tr><th>Kode</th><th>Nama Proyek</th><th>Lokasi</th><th>Nilai Kontrak</th><th>Progress</th><th>Status</th><th>Aksi</th></tr></thead><tbody>' +
     currentProjects.map(p => {
       const plan = Number(p.progress_plan) || 0;
@@ -605,18 +647,20 @@ async function loadProjectsPage() {
         '<td>' + fmtRp(p.nilai_kontrak) + '</td>' +
         '<td><div style="font-size:11px;margin-bottom:3px">Rencana: ' + plan + '% | Aktual: ' + actual + '%</div><div class="progress-bar"><div class="progress-fill" style="width:' + Math.min(actual,100) + '%"></div></div></td>' +
         '<td><span class="badge ' + statusClass + '">' + esc(p.status) + '</span></td>' +
-        '<td><button class="btn btn-sm btn-outline" onclick="editProject(\'' + pid + '\')">✏️</button> ' +
-            '<button class="btn btn-sm btn-danger" onclick="delProject(\'' + pid + '\')">🗑️</button></td>' +
+        '<td>' + (canEdit ? '<button class="btn btn-sm btn-outline" onclick="editProject(\'' + pid + '\')">✏️</button>' : '') + ' ' +
+              (canDel ? '<button class="btn btn-sm btn-danger" onclick="delProject(\'' + pid + '\')">🗑️</button>' : '') + '</td>' +
       '</tr>';
     }).join('') + '</tbody>';
 }
 
 function editProject(id) {
+  if (!can('projects','edit')) { toast('Akses ditolak', 'error'); return; }
   const p = currentProjects.find(x => x.id === id);
   if (p) openProjectModal(p);
 }
 
 function openProjectModal(data) {
+  if (!can('projects', data ? 'edit' : 'create')) { toast('Akses ditolak', 'error'); return; }
   const p = data || {};
   document.getElementById('modalTitle').textContent = data ? 'Edit Proyek' : 'Proyek Baru';
   document.getElementById('modalBody').innerHTML =
@@ -650,29 +694,25 @@ function openProjectModal(data) {
 }
 
 async function saveProject(id) {
+  if (id && !can('projects','edit')) { toast('Akses ditolak', 'error'); return; }
+  if (!id && !can('projects','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
-    id: id || '', kode: val('pKode'), nama: val('pNama'),
-    lokasi: val('pLokasi'), owner: val('pOwner'),
-    nilai_kontrak: val('pNilai'), tgl_mulai: val('pTglMulai'),
-    tgl_selesai: val('pTglSelesai'), status: val('pStatus'),
-    progress_plan: val('pPlan'), progress_actual: val('pActual'),
-    deskripsi: val('pDesk')
+    id: id || '', kode: val('pKode'), nama: val('pNama'), lokasi: val('pLokasi'), owner: val('pOwner'),
+    nilai_kontrak: val('pNilai'), tgl_mulai: val('pTglMulai'), tgl_selesai: val('pTglSelesai'),
+    status: val('pStatus'), progress_plan: val('pPlan'), progress_actual: val('pActual'), deskripsi: val('pDesk')
   };
   if (!data.kode || !data.nama) { toast('Kode & nama wajib', 'error'); return; }
   const res = await api('saveProject', data);
-  if (res && res.success) {
-    toast('Proyek tersimpan', 'success'); closeModal();
-    await loadProjects(); loadProjectsPage();
-  } else toast((res && res.message) || 'Gagal', 'error');
+  if (res && res.success) { toast('Proyek tersimpan', 'success'); closeModal(); await loadProjects(); loadProjectsPage(); }
+  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 async function delProject(id) {
+  if (!can('projects','delete')) { toast('Akses ditolak', 'error'); return; }
   if (!confirm('Hapus proyek ini?')) return;
-  const res = await api('deleteProject', { id: id });
-  if (res && res.success) {
-    toast('Proyek dihapus', 'success');
-    await loadProjects(); loadProjectsPage();
-  } else toast((res && res.message) || 'Gagal', 'error');
+  const res = await api('deleteProject', { id });
+  if (res && res.success) { toast('Terhapus', 'success'); await loadProjects(); loadProjectsPage(); }
+  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
@@ -692,30 +732,20 @@ async function loadDashboard() {
 
   const po = document.getElementById('projectsOverview');
   const projects = d.projects || [];
-  if (!projects.length) { po.innerHTML = '<div class="empty">Belum ada proyek</div>'; }
-  else {
-    po.innerHTML = projects.slice(0, 5).map(p =>
-      '<div style="padding:12px 0;border-bottom:1px solid #e2e8f0">' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><b>' + esc(p.nama) + '</b><span>' + (p.progress_actual || 0) + '% / ' + (p.progress_plan || 0) + '%</span></div>' +
-        '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.min(Number(p.progress_actual) || 0, 100) + '%"></div></div>' +
-      '</div>'
-    ).join('');
-  }
+  if (!projects.length) po.innerHTML = '<div class="empty">Belum ada proyek</div>';
+  else po.innerHTML = projects.slice(0, 5).map(p =>
+    '<div style="padding:12px 0;border-bottom:1px solid #e2e8f0">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><b>' + esc(p.nama) + '</b><span>' + (p.progress_actual || 0) + '% / ' + (p.progress_plan || 0) + '%</span></div>' +
+      '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.min(Number(p.progress_actual) || 0, 100) + '%"></div></div>' +
+    '</div>').join('');
 
   const ctx = document.getElementById('cashflowChart');
   if (ctx && projects.length) {
     if (cashflowChartInstance) cashflowChartInstance.destroy();
     cashflowChartInstance = new Chart(ctx, {
       type: 'bar',
-      data: {
-        labels: projects.map(p => String(p.nama || '').substring(0, 20)),
-        datasets: [{ label: 'Nilai Kontrak', data: projects.map(p => Number(p.nilai_kontrak) || 0), backgroundColor: '#3b82f6' }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { ticks: { callback: v => 'Rp ' + (v / 1000000).toFixed(0) + 'jt' } } }
-      }
+      data: { labels: projects.map(p => String(p.nama || '').substring(0, 20)), datasets: [{ label: 'Nilai Kontrak', data: projects.map(p => Number(p.nilai_kontrak) || 0), backgroundColor: '#3b82f6' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'Rp ' + (v / 1000000).toFixed(0) + 'jt' } } } }
     });
   }
 }
@@ -724,74 +754,69 @@ async function loadDashboard() {
 // WBS
 // ==================================================================
 async function loadWBS() {
+  toggleCreateButton('#page-wbs .btn-primary', 'wbs');
   const pid = val('wbsProject');
   const t = document.getElementById('wbsTable');
-  if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek terlebih dahulu</div></td></tr>'; return; }
+  if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
   const res = await api('getWBS', { projectId: pid });
   const list = (res && res.data) || [];
-  if (!list.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada WBS. Klik "Tambah Tugas".</div></td></tr>'; return; }
+  if (!list.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada WBS.</div></td></tr>'; return; }
+  const canDel = can('wbs','delete');
   t.innerHTML = '<thead><tr><th>Kode</th><th>Nama Tugas</th><th>Durasi</th><th>Mulai</th><th>Selesai</th><th>Bobot</th><th>Progress</th><th>Predecessor</th><th>Aksi</th></tr></thead><tbody>' +
     list.map(w =>
-      '<tr>' +
-        '<td><b>' + esc(w.kode) + '</b></td><td>' + esc(w.nama) + '</td>' +
+      '<tr><td><b>' + esc(w.kode) + '</b></td><td>' + esc(w.nama) + '</td>' +
         '<td>' + (w.durasi || 0) + ' hari</td><td>' + esc(w.start || '-') + '</td><td>' + esc(w.finish || '-') + '</td>' +
         '<td>' + (w.bobot || 0) + '%</td>' +
         '<td><div class="progress-bar" style="width:80px;display:inline-block;vertical-align:middle"><div class="progress-fill" style="width:' + Math.min(Number(w.progress) || 0, 100) + '%"></div></div> ' + (w.progress || 0) + '%</td>' +
         '<td>' + esc(w.predecessor || '-') + '</td>' +
-        '<td><button class="btn btn-sm btn-danger" onclick="delWBS(\'' + esc(w.id) + '\')">🗑️</button></td>' +
-      '</tr>'
+        '<td>' + (canDel ? '<button class="btn btn-sm btn-danger" onclick="delWBS(\'' + esc(w.id) + '\')">🗑️</button>' : '') + '</td></tr>'
     ).join('') + '</tbody>';
 }
 
 function openWBSModal() {
-  if (!val('wbsProject')) { toast('Pilih proyek dulu', 'error'); return; }
+  if (!can('wbs','create')) { toast('Akses ditolak', 'error'); return; }
+  if (!val('wbsProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Tambah WBS';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Kode *</label><input id="wKode"></div>' +
-      '<div class="form-group"><label>Durasi (hari)</label><input type="number" id="wDurasi" value="1"></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Kode *</label><input id="wKode"></div>' +
+      '<div class="form-group"><label>Durasi (hari)</label><input type="number" id="wDurasi" value="1"></div></div>' +
     '<div class="form-group"><label>Nama Tugas *</label><input id="wNama"></div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Mulai</label><input type="date" id="wStart"></div>' +
-      '<div class="form-group"><label>Selesai</label><input type="date" id="wFinish"></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Bobot (%)</label><input type="number" id="wBobot" value="10"></div>' +
-      '<div class="form-group"><label>Progress (%)</label><input type="number" id="wProgress" value="0"></div>' +
-    '</div>' +
-    '<div class="form-group"><label>Predecessor (kode)</label><input id="wPred" placeholder="misal: A,B"></div>' +
+    '<div class="form-row"><div class="form-group"><label>Mulai</label><input type="date" id="wStart"></div>' +
+      '<div class="form-group"><label>Selesai</label><input type="date" id="wFinish"></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Bobot (%)</label><input type="number" id="wBobot" value="10"></div>' +
+      '<div class="form-group"><label>Progress (%)</label><input type="number" id="wProgress" value="0"></div></div>' +
+    '<div class="form-group"><label>Predecessor</label><input id="wPred" placeholder="A,B"></div>' +
     '<div class="form-group"><label>PIC</label><input id="wPic"></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveWBS()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveWBS() {
+  if (!can('wbs','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('wbsProject'), kode: val('wKode'), nama: val('wNama'),
     durasi: val('wDurasi'), start: val('wStart'), finish: val('wFinish'),
-    bobot: val('wBobot'), progress: val('wProgress'),
-    predecessor: val('wPred'), pic: val('wPic')
+    bobot: val('wBobot'), progress: val('wProgress'), predecessor: val('wPred'), pic: val('wPic')
   };
-  if (!data.kode || !data.nama) { toast('Kode & nama wajib', 'error'); return; }
+  if (!data.kode || !data.nama) { toast('Lengkapi data', 'error'); return; }
   const res = await api('saveWBS', data);
-  if (res && res.success) { toast('WBS tersimpan', 'success'); closeModal(); loadWBS(); }
+  if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadWBS(); }
   else toast((res && res.message) || 'Gagal', 'error');
 }
 
 async function delWBS(id) {
+  if (!can('wbs','delete')) { toast('Akses ditolak', 'error'); return; }
   if (!confirm('Hapus?')) return;
-  const res = await api('deleteWBS', { id: id });
+  const res = await api('deleteWBS', { id });
   if (res && res.success) { toast('Terhapus', 'success'); loadWBS(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // BUDGET
 // ==================================================================
 async function loadBudget() {
+  toggleCreateButton('#page-budget .btn-primary', 'budget');
   const pid = val('budgetProject');
   const t = document.getElementById('budgetTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -799,57 +824,56 @@ async function loadBudget() {
   const list = (res && res.data) || [];
   if (!list.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada item RAB</div></td></tr>'; return; }
   const total = list.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
+  const canDel = can('budget','delete');
   t.innerHTML = '<thead><tr><th>Kode</th><th>Uraian</th><th>Satuan</th><th>Volume</th><th>Harga Satuan</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>' +
     list.map(b =>
       '<tr><td>' + esc(b.kode) + '</td><td>' + esc(b.uraian) + '</td><td>' + esc(b.satuan) + '</td>' +
         '<td>' + fmtNum(b.volume) + '</td><td>' + fmtRp(b.harga_satuan) + '</td><td><b>' + fmtRp(b.jumlah) + '</b></td>' +
-        '<td><button class="btn btn-sm btn-danger" onclick="delBudget(\'' + esc(b.id) + '\')">🗑️</button></td></tr>'
+        '<td>' + (canDel ? '<button class="btn btn-sm btn-danger" onclick="delBudget(\'' + esc(b.id) + '\')">🗑️</button>' : '') + '</td></tr>'
     ).join('') +
     '<tr style="background:#f8fafc;font-weight:700"><td colspan="5" style="text-align:right">TOTAL RAB</td><td colspan="2">' + fmtRp(total) + '</td></tr></tbody>';
 }
 
 function openBudgetModal() {
-  if (!val('budgetProject')) { toast('Pilih proyek dulu', 'error'); return; }
+  if (!can('budget','create')) { toast('Akses ditolak', 'error'); return; }
+  if (!val('budgetProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Tambah Item RAB';
   document.getElementById('modalBody').innerHTML =
     '<div class="form-group"><label>Kode *</label><input id="bKode"></div>' +
-    '<div class="form-group"><label>Uraian Pekerjaan *</label><input id="bUraian"></div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Satuan</label><input id="bSatuan" placeholder="m3, m2, ls"></div>' +
-      '<div class="form-group"><label>Kategori</label><input id="bKat" placeholder="Struktur/Arsitektur"></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Volume</label><input type="number" id="bVol" value="1"></div>' +
-      '<div class="form-group"><label>Harga Satuan</label><input type="number" id="bHarga" value="0"></div>' +
-    '</div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+    '<div class="form-group"><label>Uraian *</label><input id="bUraian"></div>' +
+    '<div class="form-row"><div class="form-group"><label>Satuan</label><input id="bSatuan"></div>' +
+      '<div class="form-group"><label>Kategori</label><input id="bKat"></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Volume</label><input type="number" id="bVol" value="1"></div>' +
+      '<div class="form-group"><label>Harga Satuan</label><input type="number" id="bHarga" value="0"></div></div>';
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveBudget()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveBudget() {
+  if (!can('budget','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('budgetProject'), kode: val('bKode'), uraian: val('bUraian'),
     satuan: val('bSatuan'), volume: val('bVol'), harga_satuan: val('bHarga'), kategori: val('bKat')
   };
-  if (!data.kode || !data.uraian) { toast('Kode & uraian wajib', 'error'); return; }
+  if (!data.kode || !data.uraian) { toast('Lengkapi data', 'error'); return; }
   const res = await api('saveBudget', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadBudget(); }
   else toast((res && res.message) || 'Gagal', 'error');
 }
 
 async function delBudget(id) {
+  if (!can('budget','delete')) { toast('Akses ditolak', 'error'); return; }
   if (!confirm('Hapus?')) return;
-  const res = await api('deleteBudget', { id: id });
+  const res = await api('deleteBudget', { id });
   if (res && res.success) { toast('Terhapus', 'success'); loadBudget(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // FINANCE
 // ==================================================================
 async function loadFinance() {
+  toggleCreateButton('#page-finance .btn-primary', 'finance');
   const pid = val('financeProject');
   if (!pid) {
     document.getElementById('financeStats').innerHTML = '';
@@ -876,34 +900,30 @@ async function loadFinance() {
 }
 
 function openTransactionModal() {
-  if (!val('financeProject')) { toast('Pilih proyek dulu', 'error'); return; }
+  if (!can('finance','create')) { toast('Akses ditolak', 'error'); return; }
+  if (!val('financeProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Transaksi Baru';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tanggal *</label><input type="date" id="tTgl" value="' + today() + '"></div>' +
-      '<div class="form-group"><label>Tipe *</label><select id="tTipe"><option>Pemasukan</option><option>Pengeluaran</option></select></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Kategori</label><input id="tKat" placeholder="Material/Upah/Operasional"></div>' +
-      '<div class="form-group"><label>Jumlah (Rp) *</label><input type="number" id="tJumlah" value="0"></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Tanggal</label><input type="date" id="tTgl" value="' + today() + '"></div>' +
+      '<div class="form-group"><label>Tipe</label><select id="tTipe"><option>Pemasukan</option><option>Pengeluaran</option></select></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Kategori</label><input id="tKat"></div>' +
+      '<div class="form-group"><label>Jumlah (Rp)</label><input type="number" id="tJumlah" value="0"></div></div>' +
     '<div class="form-group"><label>Keterangan</label><input id="tKet"></div>' +
     '<div class="form-group"><label>Metode</label><select id="tMet"><option>Transfer</option><option>Tunai</option><option>Cek</option></select></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveTransaction()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveTransaction() {
+  if (!can('finance','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('financeProject'), tanggal: val('tTgl'), tipe: val('tTipe'),
     kategori: val('tKat'), keterangan: val('tKet'), jumlah: val('tJumlah'), metode: val('tMet')
   };
-  if (!data.jumlah || Number(data.jumlah) <= 0) { toast('Jumlah wajib diisi', 'error'); return; }
+  if (!data.jumlah || Number(data.jumlah) <= 0) { toast('Jumlah wajib', 'error'); return; }
   const res = await api('saveTransaction', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadFinance(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
@@ -919,8 +939,8 @@ async function loadEVM() {
     '<div class="stat-card green"><div class="label">EV</div><div class="value">' + fmtRp(d.EV) + '</div></div>' +
     '<div class="stat-card orange"><div class="label">PV</div><div class="value">' + fmtRp(d.PV) + '</div></div>' +
     '<div class="stat-card red"><div class="label">AC</div><div class="value">' + fmtRp(d.AC) + '</div></div>' +
-    '<div class="stat-card ' + ((d.SPI || 0) >= 1 ? 'green' : 'red') + '"><div class="label">SPI</div><div class="value">' + (d.SPI || 0).toFixed(3) + '</div><div class="change">' + ((d.SPI || 0) >= 1 ? '✅ Sesuai/Lebih cepat' : '⚠️ Terlambat') + '</div></div>' +
-    '<div class="stat-card ' + ((d.CPI || 0) >= 1 ? 'green' : 'red') + '"><div class="label">CPI</div><div class="value">' + (d.CPI || 0).toFixed(3) + '</div><div class="change">' + ((d.CPI || 0) >= 1 ? '✅ Efisien' : '⚠️ Overbudget') + '</div></div>' +
+    '<div class="stat-card ' + ((d.SPI||0)>=1?'green':'red') + '"><div class="label">SPI</div><div class="value">' + (d.SPI || 0).toFixed(3) + '</div></div>' +
+    '<div class="stat-card ' + ((d.CPI||0)>=1?'green':'red') + '"><div class="label">CPI</div><div class="value">' + (d.CPI || 0).toFixed(3) + '</div></div>' +
     '<div class="stat-card green"><div class="label">SV</div><div class="value">' + fmtRp(d.SV) + '</div></div>' +
     '<div class="stat-card orange"><div class="label">CV</div><div class="value">' + fmtRp(d.CV) + '</div></div>' +
     '<div class="stat-card blue"><div class="label">EAC</div><div class="value">' + fmtRp(d.EAC) + '</div></div>' +
@@ -936,13 +956,10 @@ async function loadEVM() {
     const actual = weeks.map((_, i) => Math.min(actualVal, plan[i] * 0.95));
     scurveChartInstance = new Chart(ctx, {
       type: 'line',
-      data: {
-        labels: weeks,
-        datasets: [
-          { label: 'Rencana (%)', data: plan, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3 },
-          { label: 'Aktual (%)', data: actual, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.1)', fill: true, tension: .3 }
-        ]
-      },
+      data: { labels: weeks, datasets: [
+        { label: 'Rencana (%)', data: plan, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3 },
+        { label: 'Aktual (%)', data: actual, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.1)', fill: true, tension: .3 }
+      ]},
       options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
     });
   }
@@ -952,6 +969,7 @@ async function loadEVM() {
 // REPORTS
 // ==================================================================
 async function loadReports() {
+  toggleCreateButton('#page-reports .btn-primary', 'reports');
   const pid = val('reportProject');
   const t = document.getElementById('reportsTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -966,40 +984,36 @@ async function loadReports() {
 }
 
 function openReportModal() {
+  if (!can('reports','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('reportProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Laporan Harian';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tanggal *</label><input type="date" id="rTgl" value="' + today() + '"></div>' +
-      '<div class="form-group"><label>Cuaca</label><select id="rCuaca"><option>Cerah</option><option>Berawan</option><option>Hujan</option><option>Hujan Deras</option></select></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Jumlah Pekerja</label><input type="number" id="rPekerja" value="0"></div>' +
-      '<div class="form-group"><label>Pelapor</label><input id="rPelapor" value="' + esc(currentUser.nama) + '"></div>' +
-    '</div>' +
-    '<div class="form-group"><label>Volume Kerja</label><input id="rVolume" placeholder="misal: Pengecoran 15 m3"></div>' +
+    '<div class="form-row"><div class="form-group"><label>Tanggal</label><input type="date" id="rTgl" value="' + today() + '"></div>' +
+      '<div class="form-group"><label>Cuaca</label><select id="rCuaca"><option>Cerah</option><option>Berawan</option><option>Hujan</option><option>Hujan Deras</option></select></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Pekerja</label><input type="number" id="rPekerja" value="0"></div>' +
+      '<div class="form-group"><label>Pelapor</label><input id="rPelapor" value="' + esc(currentUser.nama) + '"></div></div>' +
+    '<div class="form-group"><label>Volume Kerja</label><input id="rVolume"></div>' +
     '<div class="form-group"><label>Keterangan</label><textarea id="rKet" rows="3"></textarea></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveReport()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveReport() {
+  if (!can('reports','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('reportProject'), tanggal: val('rTgl'), cuaca: val('rCuaca'),
-    jumlah_pekerja: val('rPekerja'), volume_kerja: val('rVolume'),
-    keterangan: val('rKet'), pelapor: val('rPelapor')
+    jumlah_pekerja: val('rPekerja'), volume_kerja: val('rVolume'), keterangan: val('rKet'), pelapor: val('rPelapor')
   };
   const res = await api('saveReport', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadReports(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // CHANGE ORDERS
 // ==================================================================
 async function loadChanges() {
+  toggleCreateButton('#page-changes .btn-primary', 'changes');
   const pid = val('changeProject');
   const t = document.getElementById('changesTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -1016,47 +1030,43 @@ async function loadChanges() {
 }
 
 function openChangeModal() {
+  if (!can('changes','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('changeProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Change Order Baru';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Nomor CO *</label><input id="cNomor" placeholder="CO-001"></div>' +
-      '<div class="form-group"><label>Tanggal</label><input type="date" id="cTgl" value="' + today() + '"></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tipe</label><select id="cTipe"><option>Penambahan</option><option>Pengurangan</option></select></div>' +
-      '<div class="form-group"><label>Nilai</label><input type="number" id="cNilai" value="0"></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Nomor *</label><input id="cNomor"></div>' +
+      '<div class="form-group"><label>Tanggal</label><input type="date" id="cTgl" value="' + today() + '"></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Tipe</label><select id="cTipe"><option>Penambahan</option><option>Pengurangan</option></select></div>' +
+      '<div class="form-group"><label>Nilai</label><input type="number" id="cNilai" value="0"></div></div>' +
     '<div class="form-group"><label>Deskripsi *</label><textarea id="cDesk" rows="3"></textarea></div>' +
     '<div class="form-group"><label>Status</label><select id="cStatus"><option>Pending</option><option>Approved</option><option>Rejected</option></select></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveChange()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveChange() {
+  if (!can('changes','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('changeProject'), nomor: val('cNomor'), tanggal: val('cTgl'),
-    tipe: val('cTipe'), nilai: val('cNilai'), deskripsi: val('cDesk'),
-    status: val('cStatus'), approved_by: currentUser.nama
+    tipe: val('cTipe'), nilai: val('cNilai'), deskripsi: val('cDesk'), status: val('cStatus'), approved_by: currentUser.nama
   };
-  if (!data.nomor || !data.deskripsi) { toast('Nomor & deskripsi wajib', 'error'); return; }
+  if (!data.nomor || !data.deskripsi) { toast('Lengkapi data', 'error'); return; }
   const res = await api('saveChangeOrder', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadChanges(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // RESOURCES
 // ==================================================================
 async function loadResources() {
+  toggleCreateButton('#page-resources .btn-primary', 'resources');
   const pid = val('resourceProject');
   const t = document.getElementById('resourcesTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
   const res = await api('getResources', { projectId: pid });
   const list = (res && res.data) || [];
-  if (!list.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada data resource</div></td></tr>'; return; }
+  if (!list.length) { t.innerHTML = '<tr><td><div class="empty">Belum ada resource</div></td></tr>'; return; }
   t.innerHTML = '<thead><tr><th>Nama</th><th>Tipe</th><th>Jumlah</th><th>Status</th><th>Kondisi</th><th>Lokasi</th></tr></thead><tbody>' +
     list.map(r =>
       '<tr><td><b>' + esc(r.nama) + '</b></td><td>' + esc(r.tipe || '-') + '</td><td>' + (r.jumlah || 0) + '</td>' +
@@ -1066,41 +1076,37 @@ async function loadResources() {
 }
 
 function openResourceModal() {
+  if (!can('resources','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('resourceProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Resource Baru';
   document.getElementById('modalBody').innerHTML =
     '<div class="form-group"><label>Nama *</label><input id="resNama"></div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tipe</label><select id="resTipe"><option>Material</option><option>Alat Berat</option><option>Kendaraan</option><option>Peralatan</option></select></div>' +
-      '<div class="form-group"><label>Jumlah</label><input type="number" id="resJumlah" value="1"></div>' +
-    '</div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Status</label><select id="resStatus"><option>Tersedia</option><option>Digunakan</option><option>Maintenance</option></select></div>' +
-      '<div class="form-group"><label>Kondisi</label><select id="resKondisi"><option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option></select></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Tipe</label><select id="resTipe"><option>Material</option><option>Alat Berat</option><option>Kendaraan</option><option>Peralatan</option></select></div>' +
+      '<div class="form-group"><label>Jumlah</label><input type="number" id="resJumlah" value="1"></div></div>' +
+    '<div class="form-row"><div class="form-group"><label>Status</label><select id="resStatus"><option>Tersedia</option><option>Digunakan</option><option>Maintenance</option></select></div>' +
+      '<div class="form-group"><label>Kondisi</label><select id="resKondisi"><option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option></select></div></div>' +
     '<div class="form-group"><label>Lokasi</label><input id="resLokasi"></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveResource()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveResource() {
+  if (!can('resources','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('resourceProject'), nama: val('resNama'), tipe: val('resTipe'),
-    jumlah: val('resJumlah'), status: val('resStatus'),
-    kondisi: val('resKondisi'), lokasi: val('resLokasi')
+    jumlah: val('resJumlah'), status: val('resStatus'), kondisi: val('resKondisi'), lokasi: val('resLokasi')
   };
   if (!data.nama) { toast('Nama wajib', 'error'); return; }
   const res = await api('saveResource', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadResources(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // QC
 // ==================================================================
 async function loadQC() {
+  toggleCreateButton('#page-qc .btn-primary', 'qc');
   const pid = val('qcProject');
   const t = document.getElementById('qcTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -1116,39 +1122,37 @@ async function loadQC() {
 }
 
 function openQCModal() {
+  if (!can('qc','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('qcProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Inspeksi QC';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tanggal</label><input type="date" id="qcTgl" value="' + today() + '"></div>' +
-      '<div class="form-group"><label>Hasil</label><select id="qcHasil"><option>OK</option><option>Not OK</option></select></div>' +
-    '</div>' +
-    '<div class="form-group"><label>Item *</label><input id="qcItem" placeholder="misal: Beton Kolom Lantai 2"></div>' +
+    '<div class="form-row"><div class="form-group"><label>Tanggal</label><input type="date" id="qcTgl" value="' + today() + '"></div>' +
+      '<div class="form-group"><label>Hasil</label><select id="qcHasil"><option>OK</option><option>Not OK</option></select></div></div>' +
+    '<div class="form-group"><label>Item *</label><input id="qcItem"></div>' +
     '<div class="form-group"><label>Lokasi</label><input id="qcLokasi"></div>' +
     '<div class="form-group"><label>Catatan</label><textarea id="qcCatatan" rows="2"></textarea></div>' +
     '<div class="form-group"><label>Inspektur</label><input id="qcInspektur" value="' + esc(currentUser.nama) + '"></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveQC()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveQC() {
+  if (!can('qc','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('qcProject'), tanggal: val('qcTgl'), item: val('qcItem'),
-    lokasi: val('qcLokasi'), hasil: val('qcHasil'),
-    catatan: val('qcCatatan'), inspektur: val('qcInspektur')
+    lokasi: val('qcLokasi'), hasil: val('qcHasil'), catatan: val('qcCatatan'), inspektur: val('qcInspektur')
   };
   if (!data.item) { toast('Item wajib', 'error'); return; }
   const res = await api('saveQC', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadQC(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // HSE
 // ==================================================================
 async function loadHSE() {
+  toggleCreateButton('#page-hse .btn-primary', 'hse');
   const pid = val('hseProject');
   const t = document.getElementById('hseTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -1165,41 +1169,37 @@ async function loadHSE() {
 }
 
 function openHSEModal() {
+  if (!can('hse','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('hseProject')) { toast('Pilih proyek', 'error'); return; }
-  document.getElementById('modalTitle').textContent = 'Laporan K3/HSE';
+  document.getElementById('modalTitle').textContent = 'Laporan K3';
   document.getElementById('modalBody').innerHTML =
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tanggal</label><input type="date" id="hseTgl" value="' + today() + '"></div>' +
-      '<div class="form-group"><label>Tipe</label><select id="hseTipe"><option>Insiden</option><option>Near Miss</option><option>Toolbox Meeting</option><option>Inspeksi APD</option></select></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Tanggal</label><input type="date" id="hseTgl" value="' + today() + '"></div>' +
+      '<div class="form-group"><label>Tipe</label><select id="hseTipe"><option>Insiden</option><option>Near Miss</option><option>Toolbox Meeting</option><option>Inspeksi APD</option></select></div></div>' +
     '<div class="form-group"><label>Deskripsi *</label><textarea id="hseDesk" rows="2"></textarea></div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Tingkat</label><select id="hseTingkat"><option>Rendah</option><option>Sedang</option><option>Tinggi</option></select></div>' +
-      '<div class="form-group"><label>Pelapor</label><input id="hsePelapor" value="' + esc(currentUser.nama) + '"></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Tingkat</label><select id="hseTingkat"><option>Rendah</option><option>Sedang</option><option>Tinggi</option></select></div>' +
+      '<div class="form-group"><label>Pelapor</label><input id="hsePelapor" value="' + esc(currentUser.nama) + '"></div></div>' +
     '<div class="form-group"><label>Tindakan</label><textarea id="hseTindakan" rows="2"></textarea></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveHSE()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveHSE() {
+  if (!can('hse','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('hseProject'), tanggal: val('hseTgl'), tipe: val('hseTipe'),
-    deskripsi: val('hseDesk'), tingkat: val('hseTingkat'),
-    tindakan: val('hseTindakan'), pelapor: val('hsePelapor')
+    deskripsi: val('hseDesk'), tingkat: val('hseTingkat'), tindakan: val('hseTindakan'), pelapor: val('hsePelapor')
   };
   if (!data.deskripsi) { toast('Deskripsi wajib', 'error'); return; }
   const res = await api('saveHSE', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadHSE(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // DOCUMENTS
 // ==================================================================
 async function loadDocuments() {
+  toggleCreateButton('#page-documents .btn-primary', 'documents');
   const pid = val('docProject');
   const t = document.getElementById('documentsTable');
   if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
@@ -1215,22 +1215,21 @@ async function loadDocuments() {
 }
 
 function openDocumentModal() {
+  if (!can('documents','create')) { toast('Akses ditolak', 'error'); return; }
   if (!val('docProject')) { toast('Pilih proyek', 'error'); return; }
   document.getElementById('modalTitle').textContent = 'Tambah Dokumen';
   document.getElementById('modalBody').innerHTML =
     '<div class="form-group"><label>Nama Dokumen *</label><input id="dNama"></div>' +
-    '<div class="form-row">' +
-      '<div class="form-group"><label>Kategori</label><select id="dKat"><option>Shop Drawing</option><option>As-Built</option><option>Kontrak</option><option>Izin</option><option>Berita Acara</option><option>Lainnya</option></select></div>' +
-      '<div class="form-group"><label>Versi</label><input id="dVersi" value="1.0"></div>' +
-    '</div>' +
+    '<div class="form-row"><div class="form-group"><label>Kategori</label><select id="dKat"><option>Shop Drawing</option><option>As-Built</option><option>Kontrak</option><option>Izin</option><option>Berita Acara</option><option>Lainnya</option></select></div>' +
+      '<div class="form-group"><label>Versi</label><input id="dVersi" value="1.0"></div></div>' +
     '<div class="form-group"><label>URL Dokumen</label><input id="dUrl" placeholder="https://..."></div>';
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveDocument()">💾 Simpan</button>';
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 async function saveDocument() {
+  if (!can('documents','create')) { toast('Akses ditolak', 'error'); return; }
   const data = {
     project_id: val('docProject'), nama: val('dNama'), kategori: val('dKat'),
     versi: val('dVersi'), url: val('dUrl'), uploaded_by: currentUser.nama
@@ -1238,30 +1237,27 @@ async function saveDocument() {
   if (!data.nama) { toast('Nama wajib', 'error'); return; }
   const res = await api('saveDocument', data);
   if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); loadDocuments(); }
-  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
-// USERS - KHUSUS ADMINISTRATOR
+// USERS (ADMIN ONLY)
 // ==================================================================
 async function loadUsers() {
   const t = document.getElementById('usersTable');
   const btn = document.getElementById('btnAddUser');
 
   if (!currentUser || currentUser.role !== 'admin') {
-    t.innerHTML = '<tr><td><div class="empty"><div class="lock-icon">🔒</div>Akses ditolak.<br>Hanya administrator yang dapat mengelola user.</div></td></tr>';
+    t.innerHTML = '<tr><td><div class="empty"><div class="lock-icon">🔒</div>Akses ditolak.<br>Hanya administrator.</div></td></tr>';
     if (btn) btn.style.display = 'none';
     return;
   }
   if (btn) btn.style.display = 'inline-flex';
 
   const res = await api('getUsers', { adminId: currentUser.id });
-
   if (!res || !res.success) {
-    t.innerHTML = '<tr><td><div class="empty">' + esc((res && res.message) || 'Gagal memuat user') + '</div></td></tr>';
+    t.innerHTML = '<tr><td><div class="empty">' + esc((res && res.message) || 'Gagal') + '</div></td></tr>';
     return;
   }
-
   usersCache = res.data || [];
 
   t.innerHTML = '<thead><tr><th>Username</th><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>' +
@@ -1270,131 +1266,151 @@ async function loadUsers() {
       const isMainAdmin = u.username === 'admin';
       const cannotDelete = isSelf || isMainAdmin;
       const aktif = (u.aktif === true || String(u.aktif) === 'true');
-
       return '<tr>' +
         '<td><b>' + esc(u.username) + '</b>' + (isSelf ? ' <span class="badge badge-info">Anda</span>' : '') + '</td>' +
-        '<td>' + esc(u.nama) + '</td>' +
-        '<td>' + esc(u.email || '-') + '</td>' +
+        '<td>' + esc(u.nama) + '</td><td>' + esc(u.email || '-') + '</td>' +
         '<td><span class="badge badge-info">' + esc(u.role) + '</span></td>' +
         '<td><span class="badge ' + (aktif ? 'badge-success' : 'badge-gray') + '">' + (aktif ? 'Aktif' : 'Nonaktif') + '</span></td>' +
-        '<td>' +
-          '<button class="btn btn-sm btn-outline" onclick="editUser(\'' + esc(u.id) + '\')" title="Edit user">✏️</button> ' +
+        '<td><button class="btn btn-sm btn-outline" onclick="editUser(\'' + esc(u.id) + '\')">✏️</button> ' +
           '<button class="btn btn-sm btn-danger" onclick="delUser(\'' + esc(u.id) + '\')" ' +
-            (cannotDelete ? 'disabled title="Tidak dapat dihapus"' : 'title="Hapus user"') + '>🗑️</button>' +
-        '</td>' +
-      '</tr>';
+            (cannotDelete ? 'disabled title="Tidak dapat dihapus"' : '') + '>🗑️</button></td></tr>';
     }).join('') + '</tbody>';
 }
 
 function openUserModal(data) {
-  if (!currentUser || currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error');
-    return;
-  }
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
   const u = data || {};
   const isEdit = !!data;
   const isMainAdmin = u.username === 'admin';
+  document.getElementById('modalTitle').textContent = isEdit ? 'Edit User' : 'Tambah User';
 
-  document.getElementById('modalTitle').textContent = isEdit ? '✏️ Edit User' : '➕ Tambah User';
-
-  let html = '';
-  html += '<div class="form-row">' +
-    '<div class="form-group"><label>Username *</label>' +
-      '<input id="uUsername" value="' + esc(u.username || '') + '" ' +
-      (isMainAdmin ? 'readonly' : '') + '>' +
-      (isMainAdmin ? '<small>Username admin utama tidak dapat diubah</small>' : '') +
-    '</div>' +
+  let html = '<div class="form-row">' +
+    '<div class="form-group"><label>Username *</label><input id="uUsername" value="' + esc(u.username || '') + '" ' +
+      (isMainAdmin ? 'readonly' : '') + '>' + (isMainAdmin ? '<small>Tidak dapat diubah</small>' : '') + '</div>' +
     '<div class="form-group"><label>Password ' + (isEdit ? '(opsional)' : '*') + '</label>' +
-      '<input type="password" id="uPassword" placeholder="' + (isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 4 karakter') + '">' +
-    '</div>' +
-  '</div>';
-
-  html += '<div class="form-group"><label>Nama Lengkap *</label>' +
-    '<input id="uNama" value="' + esc(u.nama || '') + '"></div>';
-  html += '<div class="form-group"><label>Email</label>' +
-    '<input type="email" id="uEmail" value="' + esc(u.email || '') + '"></div>';
-
-  html += '<div class="form-group"><label>Role</label>' +
-    '<select id="uRole" ' + (isMainAdmin ? 'disabled' : '') + '>' +
+      '<input type="password" id="uPassword" placeholder="' + (isEdit ? 'Kosongkan jika tidak diubah' : '') + '"></div></div>' +
+    '<div class="form-group"><label>Nama *</label><input id="uNama" value="' + esc(u.nama || '') + '"></div>' +
+    '<div class="form-group"><label>Email</label><input type="email" id="uEmail" value="' + esc(u.email || '') + '"></div>' +
+    '<div class="form-group"><label>Role</label><select id="uRole" ' + (isMainAdmin ? 'disabled' : '') + '>' +
       '<option ' + (u.role === 'admin' ? 'selected' : '') + '>admin</option>' +
       '<option ' + (u.role === 'manager' ? 'selected' : '') + '>manager</option>' +
       '<option ' + (u.role === 'supervisor' ? 'selected' : '') + '>supervisor</option>' +
-      '<option ' + (u.role === 'viewer' ? 'selected' : '') + '>viewer</option>' +
-    '</select>' +
-    (isMainAdmin ? '<small>Role admin utama tidak dapat diubah</small>' : '') +
-  '</div>';
+      '<option ' + (u.role === 'viewer' ? 'selected' : '') + '>viewer</option></select>' +
+      (isMainAdmin ? '<small>Tidak dapat diubah</small>' : '') + '</div>';
 
   if (isEdit) {
     const aktif = (u.aktif === true || String(u.aktif) === 'true');
-    html += '<div class="form-group"><label>Status</label>' +
-      '<select id="uAktif">' +
-        '<option value="true" ' + (aktif ? 'selected' : '') + '>Aktif</option>' +
-        '<option value="false" ' + (!aktif ? 'selected' : '') + '>Nonaktif</option>' +
-      '</select></div>';
+    html += '<div class="form-group"><label>Status</label><select id="uAktif">' +
+      '<option value="true" ' + (aktif ? 'selected' : '') + '>Aktif</option>' +
+      '<option value="false" ' + (!aktif ? 'selected' : '') + '>Nonaktif</option></select></div>';
   }
-
   document.getElementById('modalBody').innerHTML = html;
-
-  document.getElementById('modalFooter').innerHTML =
-    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+  document.getElementById('modalFooter').innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
     '<button class="btn btn-primary" style="width:auto" onclick="saveUser(\'' + esc(u.id || '') + '\')">💾 Simpan</button>';
-
   document.getElementById('modalOverlay').classList.add('active');
 }
 
 function editUser(id) {
   const u = usersCache.find(x => x.id === id);
   if (u) openUserModal(u);
-  else toast('User tidak ditemukan. Muat ulang halaman.', 'error');
+  else toast('User tidak ditemukan', 'error');
 }
 
 async function saveUser(id) {
-  if (!currentUser || currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error');
-    return;
-  }
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
   const data = {
-    adminId: currentUser.id,
-    id: id || '',
-    username: val('uUsername'),
-    password: val('uPassword'),
-    nama: val('uNama'),
-    email: val('uEmail'),
-    role: val('uRole'),
+    adminId: currentUser.id, id: id || '',
+    username: val('uUsername'), password: val('uPassword'),
+    nama: val('uNama'), email: val('uEmail'), role: val('uRole'),
     aktif: document.getElementById('uAktif') ? (val('uAktif') === 'true') : true
   };
-  if (!data.username || !data.nama) { toast('Username & nama wajib diisi', 'error'); return; }
-  if (!id && !data.password) { toast('Password wajib diisi untuk user baru', 'error'); return; }
+  if (!data.username || !data.nama) { toast('Username & nama wajib', 'error'); return; }
+  if (!id && !data.password) { toast('Password wajib untuk user baru', 'error'); return; }
   if (data.password && data.password.length < 4) { toast('Password minimal 4 karakter', 'error'); return; }
-
   const res = await api('saveUser', data);
-  if (res && res.success) {
-    toast(res.message || (id ? 'User diperbarui' : 'User ditambahkan'), 'success');
-    closeModal();
-    loadUsers();
-  } else toast((res && res.message) || 'Gagal menyimpan user', 'error');
+  if (res && res.success) { toast(res.message || 'Tersimpan', 'success'); closeModal(); loadUsers(); }
+  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 async function delUser(id) {
-  if (!currentUser || currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error');
-    return;
-  }
-  if (id === currentUser.id) { toast('Anda tidak dapat menghapus akun sendiri', 'error'); return; }
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  if (id === currentUser.id) { toast('Tidak dapat menghapus akun sendiri', 'error'); return; }
   const u = usersCache.find(x => x.id === id);
-  const label = u ? 'user "' + u.username + '"' : 'user ini';
-  if (!confirm('Hapus ' + label + '?\n\nTindakan ini tidak dapat dibatalkan.')) return;
-  const res = await api('deleteUser', { adminId: currentUser.id, id: id });
+  if (!confirm('Hapus user "' + (u ? u.username : '') + '"?')) return;
+  const res = await api('deleteUser', { adminId: currentUser.id, id });
+  if (res && res.success) { toast('Terhapus', 'success'); loadUsers(); }
+  else toast((res && res.message) || 'Gagal', 'error');
+}
+
+// ==================================================================
+// PERMISSIONS (RBAC UI)
+// ==================================================================
+async function openPermissionsModal() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  const res = await api('getPermissions', { adminId: currentUser.id });
+  if (!res || !res.success) { toast((res && res.message) || 'Gagal memuat', 'error'); return; }
+
+  const perms = res.data || {};
+  const modules = res.modules || [];
+  const roles = (res.roles || []).filter(r => r !== 'admin');
+
+  document.getElementById('modalTitle').textContent = '🔐 Hak Akses Role';
+  document.getElementById('modalBox').classList.add('wide');
+
+  let html = '<p style="margin-bottom:16px;font-size:13px;color:#64748b">Atur izin per role dan modul. Role <b>admin</b> selalu full access. Menu <b>users</b> & <b>settings</b> hanya admin.</p>';
+
+  roles.forEach(role => {
+    html += '<div class="perm-role-title">👤 ' + esc(role) + '</div>';
+    html += '<table class="perm-table"><thead><tr><th>Modul</th><th>Lihat</th><th>Tambah</th><th>Edit</th><th>Hapus</th></tr></thead><tbody>';
+    modules.forEach(m => {
+      if (m === 'users' || m === 'settings') return;
+      const p = (perms[role] && perms[role][m]) || {};
+      const id = role + '_' + m;
+      html += '<tr><td>' + esc(m) + '</td>';
+      ['view','create','edit','delete'].forEach(a => {
+        html += '<td><input type="checkbox" id="' + id + '_' + a + '" ' + (p['can_' + a] ? 'checked' : '') + '></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  });
+
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalFooter').innerHTML =
+    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+    '<button class="btn btn-primary" style="width:auto" onclick="savePermissionsFromModal()">💾 Simpan Hak Akses</button>';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function savePermissionsFromModal() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  const roles = ['manager', 'supervisor', 'viewer'];
+  const modules = ['projects','wbs','budget','finance','reports','changes','resources','qc','hse','documents','evm'];
+  const permissions = {};
+  roles.forEach(role => {
+    permissions[role] = {};
+    modules.forEach(m => {
+      const id = role + '_' + m;
+      permissions[role][m] = {
+        can_view: !!document.getElementById(id + '_view')?.checked,
+        can_create: !!document.getElementById(id + '_create')?.checked,
+        can_edit: !!document.getElementById(id + '_edit')?.checked,
+        can_delete: !!document.getElementById(id + '_delete')?.checked
+      };
+    });
+  });
+  const res = await api('savePermissions', { adminId: currentUser.id, permissions });
   if (res && res.success) {
-    toast(res.message || 'User berhasil dihapus', 'success');
-    loadUsers();
-  } else toast((res && res.message) || 'Gagal menghapus user', 'error');
+    toast('Hak akses tersimpan', 'success');
+    closeModal();
+  } else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
 // SETTINGS
 // ==================================================================
 async function loadSettings() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
   const s = await api('getSettings', {});
   settingsCache = (s && s.data) || {};
   document.getElementById('setCompanyName').value = settingsCache.company_name || '';
@@ -1405,33 +1421,30 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
   const data = {
-    company_name: val('setCompanyName'),
-    company_address: val('setCompanyAddress'),
-    company_phone: val('setCompanyPhone'),
-    company_whatsapp: val('setCompanyWhatsapp'),
+    company_name: val('setCompanyName'), company_address: val('setCompanyAddress'),
+    company_phone: val('setCompanyPhone'), company_whatsapp: val('setCompanyWhatsapp'),
     company_email: val('setCompanyEmail')
   };
   const res = await api('saveSettings', data);
   if (res && res.success) {
-    toast('Pengaturan tersimpan', 'success');
+    toast('Tersimpan', 'success');
     settingsCache = Object.assign({}, settingsCache, data);
-  } else toast((res && res.message) || 'Gagal', 'error');
+  }
 }
 
 // ==================================================================
 // PASSWORD
 // ==================================================================
 async function changePassword() {
-  const oldPass = val('oldPass');
-  const newPass = val('newPass');
-  const confirm = val('confirmPass');
-  if (!oldPass || !newPass) { toast('Lengkapi semua field', 'error'); return; }
-  if (newPass !== confirm) { toast('Password baru tidak cocok', 'error'); return; }
-  if (newPass.length < 4) { toast('Password minimal 4 karakter', 'error'); return; }
+  const oldPass = val('oldPass'), newPass = val('newPass'), confirm = val('confirmPass');
+  if (!oldPass || !newPass) { toast('Lengkapi field', 'error'); return; }
+  if (newPass !== confirm) { toast('Tidak cocok', 'error'); return; }
+  if (newPass.length < 4) { toast('Minimal 4 karakter', 'error'); return; }
   const res = await api('changePassword', { userId: currentUser.id, oldPassword: oldPass, newPassword: newPass });
   if (res && res.success) {
-    toast('Password berhasil diubah', 'success');
+    toast('Password diubah', 'success');
     document.getElementById('oldPass').value = '';
     document.getElementById('newPass').value = '';
     document.getElementById('confirmPass').value = '';
@@ -1445,22 +1458,19 @@ async function printBudget() {
   const pid = val('budgetProject');
   if (!pid) { toast('Pilih proyek', 'error'); return; }
   const project = currentProjects.find(p => p.id === pid);
-  if (!project) { toast('Proyek tidak ditemukan', 'error'); return; }
   const res = await api('getBudget', { projectId: pid });
   const list = (res && res.data) || [];
   const total = list.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
   const win = window.open('', '_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>RAB - ' + esc(project.nama) + '</title>' +
-    '<style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:8px}th{background:#1e40af;color:#fff}h2{margin-bottom:6px}small{color:#666}</style>' +
-    '</head><body>' +
+  win.document.write('<!DOCTYPE html><html><head><title>RAB</title>' +
+    '<style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:8px}th{background:#1e40af;color:#fff}</style></head><body>' +
     '<h2>RENCANA ANGGARAN BIAYA (RAB)</h2>' +
     '<p><b>' + esc(settingsCache.company_name || '') + '</b><br><small>' + esc(settingsCache.company_address || '') + '</small></p>' +
-    '<p>Proyek: <b>' + esc(project.nama) + '</b><br>Kode: ' + esc(project.kode) + '<br>Lokasi: ' + esc(project.lokasi || '-') + '</p>' +
-    '<table><thead><tr><th>Kode</th><th>Uraian</th><th>Satuan</th><th>Volume</th><th>Harga Satuan</th><th>Jumlah</th></tr></thead><tbody>' +
+    '<p>Proyek: <b>' + esc(project.nama) + '</b></p>' +
+    '<table><thead><tr><th>Kode</th><th>Uraian</th><th>Satuan</th><th>Volume</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>' +
     list.map(b => '<tr><td>' + esc(b.kode) + '</td><td>' + esc(b.uraian) + '</td><td>' + esc(b.satuan) + '</td><td>' + fmtNum(b.volume) + '</td><td>' + fmtRp(b.harga_satuan) + '</td><td>' + fmtRp(b.jumlah) + '</td></tr>').join('') +
-    '<tr style="font-weight:bold;background:#f0f0f0"><td colspan="5" style="text-align:right">TOTAL</td><td>' + fmtRp(total) + '</td></tr>' +
-    '</tbody></table>' +
-    '<p style="margin-top:30px;font-size:11px">Dicetak: ' + new Date().toLocaleString('id-ID') + (settingsCache.company_whatsapp ? ' | WA: ' + esc(settingsCache.company_whatsapp) : '') + '</p>' +
+    '<tr style="background:#eee;font-weight:700"><td colspan="5" style="text-align:right">TOTAL</td><td>' + fmtRp(total) + '</td></tr></tbody></table>' +
+    '<p style="margin-top:30px;font-size:11px">Dicetak: ' + new Date().toLocaleString('id-ID') + '</p>' +
     '<script>window.onload=function(){window.print()}<\/script></body></html>');
   win.document.close();
 }
@@ -1469,23 +1479,20 @@ async function printFinance() {
   const pid = val('financeProject');
   if (!pid) { toast('Pilih proyek', 'error'); return; }
   const project = currentProjects.find(p => p.id === pid);
-  if (!project) { toast('Proyek tidak ditemukan', 'error'); return; }
   const res = await api('getTransactions', { projectId: pid });
   const list = (res && res.data) || [];
   const income = list.filter(t => t.tipe === 'Pemasukan').reduce((s, t) => s + (Number(t.jumlah) || 0), 0);
   const expense = list.filter(t => t.tipe === 'Pengeluaran').reduce((s, t) => s + (Number(t.jumlah) || 0), 0);
   const win = window.open('', '_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>Arus Kas - ' + esc(project.nama) + '</title>' +
-    '<style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:8px}th{background:#1e40af;color:#fff}</style>' +
-    '</head><body>' +
+  win.document.write('<!DOCTYPE html><html><head><title>Arus Kas</title>' +
+    '<style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:8px}th{background:#1e40af;color:#fff}</style></head><body>' +
     '<h2>LAPORAN ARUS KAS</h2>' +
-    '<p><b>' + esc(settingsCache.company_name || '') + '</b><br><small>' + esc(settingsCache.company_address || '') + '</small></p>' +
-    '<p>Proyek: <b>' + esc(project.nama) + '</b> | Kode: ' + esc(project.kode) + '</p>' +
+    '<p><b>' + esc(settingsCache.company_name || '') + '</b></p>' +
+    '<p>Proyek: <b>' + esc(project.nama) + '</b></p>' +
     '<table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th></tr></thead><tbody>' +
     list.map(t => '<tr><td>' + esc(t.tanggal) + '</td><td>' + esc(t.tipe) + '</td><td>' + esc(t.kategori || '') + '</td><td>' + esc(t.keterangan || '') + '</td><td>' + fmtRp(t.jumlah) + '</td></tr>').join('') +
     '</tbody></table>' +
-    '<p style="margin-top:20px"><b>Total Pemasukan:</b> ' + fmtRp(income) + '<br><b>Total Pengeluaran:</b> ' + fmtRp(expense) + '<br><b>Saldo:</b> ' + fmtRp(income - expense) + '</p>' +
-    '<p style="margin-top:30px;font-size:11px">Dicetak: ' + new Date().toLocaleString('id-ID') + '</p>' +
+    '<p style="margin-top:20px"><b>Pemasukan:</b> ' + fmtRp(income) + '<br><b>Pengeluaran:</b> ' + fmtRp(expense) + '<br><b>Saldo:</b> ' + fmtRp(income - expense) + '</p>' +
     '<script>window.onload=function(){window.print()}<\/script></body></html>');
   win.document.close();
 }
@@ -1495,23 +1502,22 @@ async function printFinance() {
 // ==================================================================
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('active');
+  document.getElementById('modalBox').classList.remove('wide');
 }
 
 // ==================================================================
 // BOOT
 // ==================================================================
 window.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('loginPass').addEventListener('keypress', e => {
-    if (e.key === 'Enter') doLogin();
-  });
+  document.getElementById('loginPass').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
   const saved = localStorage.getItem('sk_user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
+      const permRes = await api('getMyPermissions', { role: currentUser.role });
+      currentPermissions = (permRes && permRes.success) ? permRes.data : {};
       await initApp();
-    } catch (e) {
-      localStorage.removeItem('sk_user');
-    }
+    } catch (e) { localStorage.removeItem('sk_user'); }
   }
 });
 </script>
