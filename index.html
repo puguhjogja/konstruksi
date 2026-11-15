@@ -49,7 +49,7 @@
 </main></div>
 <div id="modalRoot"></div><div id="toastRoot"></div>
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbx0g-Us4QhGrSkA_THKEDCk7G5Ar-Eil_gGjJAFXUo3UblsWcFBsITvLclXA1QId50k/exec";
+const API_URL = https://script.google.com/macros/s/AKfycbx0g-Us4QhGrSkA_THKEDCk7G5Ar-Eil_gGjJAFXUo3UblsWcFBsITvLclXA1QId50k/exec;
 const MODULES={
  projects:{title:"Data Proyek",desc:"Kelola portofolio proyek, kontrak, lokasi, dan target penyelesaian.",icon:"▣",fields:[["name","Nama Proyek","text",true],["code","Kode Proyek","text"],["client","Pemilik / Klien","text"],["location","Lokasi Proyek","text"],["manager","Manajer Proyek","text"],["startDate","Tanggal Mulai","date"],["endDate","Target Selesai","date"],["contractValue","Nilai Kontrak (Rp)","number"],["budget","Anggaran (Rp)","number"],["progress","Progres (%)","number"],["status","Status","select",false,["Perencanaan","Berjalan","Ditunda","Selesai"]]]},
  tasks:{title:"WBS & Penjadwalan",desc:"Paket pekerjaan, durasi, dependensi, dan progres pelaksanaan.",icon:"☷",fields:[["project","Proyek","text",true],["wbs","Kode WBS","text"],["name","Nama pekerjaan","text",true],["parent","Induk / Paket WBS","text"],["startDate","Mulai","date"],["endDate","Selesai","date"],["duration","Durasi (hari)","number"],["dependency","Dependensi tugas","text"],["weight","Bobot (%)","number"],["progress","Progres (%)","number"],["status","Status","select",false,["Belum Mulai","Berjalan","Tertunda","Selesai"]]]},
