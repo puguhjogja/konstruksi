@@ -104,6 +104,7 @@ tr:hover td{background:#f8fafc}
 .perm-table td:first-child{text-align:left;font-weight:600}
 .perm-table input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:#1e40af}
 .perm-role-title{font-size:14px;font-weight:700;color:#1e40af;margin:16px 0 8px;text-transform:capitalize}
+.danger-zone{border-color:#fecaca!important;background:#fef2f2!important}
 @media(max-width:768px){
 .sidebar{position:fixed;left:-260px;transition:.3s;z-index:99}
 .sidebar.show{left:0}
@@ -140,7 +141,7 @@ tr:hover td{background:#f8fafc}
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:12px">
       <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('show')">☰</button>
-      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.1</span></div>
+      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.2</span></div>
     </div>
     <div class="user-info">
       <div class="avatar" id="userAvatar">A</div>
@@ -171,7 +172,8 @@ tr:hover td{background:#f8fafc}
       <div class="nav-item" data-page="documents">📁 Dokumen</div>
       <div class="nav-section">ADMIN</div>
       <div class="nav-item" data-page="users" id="navUsers">👥 Manajemen User</div>
-      <div class="nav-item" data-page="settings">⚙️ Pengaturan</div>
+      <div class="nav-item" data-page="settings">⚙️ Pengaturan Perusahaan</div>
+      <div class="nav-item" data-page="system" id="navSystem">🛠️ Pengaturan Sistem</div>
       <div class="nav-item" data-page="password">🔑 Ganti Password</div>
     </div>
 
@@ -330,6 +332,49 @@ tr:hover td{background:#f8fafc}
         </div>
       </div>
 
+      <div class="page" id="page-system">
+        <div class="page-header">
+          <div><h2>Pengaturan Sistem</h2><p>Kelola data aplikasi — seed, reset, backup, restore (khusus administrator)</p></div>
+        </div>
+
+        <div class="stats-grid" id="systemStats"></div>
+
+        <div class="card">
+          <h3>🧪 Data Contoh</h3>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Tambahkan data contoh lengkap (2 proyek, 16 WBS, 12 RAB, 12 transaksi, 7 laporan, 3 CO, 4 QC, 4 HSE, 11 resource, 7 dokumen) untuk demonstrasi.</p>
+          <button class="btn btn-primary" style="width:auto" onclick="doSeedData()">➕ Tambahkan Data Contoh</button>
+        </div>
+
+        <div class="card">
+          <h3>💾 Backup Database</h3>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Download semua data aplikasi (kecuali password user) dalam format JSON. Simpan file ini untuk restore di masa depan.</p>
+          <button class="btn btn-primary" style="width:auto" onclick="doBackup()">⬇️ Download Backup (JSON)</button>
+        </div>
+
+        <div class="card">
+          <h3>📤 Restore Database</h3>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Upload file backup JSON. Mode <b>replace</b> menghapus semua data lama, mode <b>merge</b> menambahkan ke data yang ada.</p>
+          <div class="form-group">
+            <label>File Backup (.json)</label>
+            <input type="file" id="restoreFile" accept=".json,application/json">
+          </div>
+          <div class="form-group">
+            <label>Mode Restore</label>
+            <select id="restoreMode">
+              <option value="replace">Replace — Hapus semua data lama, ganti dengan backup</option>
+              <option value="merge">Merge — Tambahkan data backup ke data yang ada</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" style="width:auto" onclick="doRestore()">📥 Restore dari File</button>
+        </div>
+
+        <div class="card danger-zone">
+          <h3 style="color:#dc2626">⚠️ Zona Berbahaya</h3>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Hapus <b>SEMUA data</b> proyek, transaksi, WBS, RAB, laporan, dll. User & pengaturan perusahaan tetap dipertahankan. <b>Tindakan ini tidak dapat dibatalkan.</b></p>
+          <button class="btn" style="background:#dc2626;color:#fff;width:auto" onclick="doReset()">🗑️ Reset Semua Data Proyek</button>
+        </div>
+      </div>
+
       <div class="page" id="page-password">
         <div class="page-header"><div><h2>Ganti Password</h2><p>Perbarui kredensial akun Anda</p></div></div>
         <div class="card" style="max-width:500px">
@@ -357,7 +402,7 @@ tr:hover td{background:#f8fafc}
 // ==================================================================
 // ⚠️ KONFIGURASI WAJIB: Ganti dengan URL Web App Apps Script Anda
 // ==================================================================
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx8lKYkmOta9A3Qe6mWAIdYt8snzgceB5ATMlisPIlNOqaHghFncziUXZfqUHW5fqJT/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzO4K6n7izpVz7HxlENWVjE-MY1cJ9przjA2mps69-pboy6DmhulUU33aaZx4_TgU5x/exec';
 
 // ==================================================================
 // STATE
@@ -375,7 +420,7 @@ const PAGE_TO_MODULE = {
   dashboard: 'projects', projects: 'projects', wbs: 'wbs', budget: 'budget',
   finance: 'finance', evm: 'evm', reports: 'reports', changes: 'changes',
   resources: 'resources', qc: 'qc', hse: 'hse', documents: 'documents',
-  users: 'users', settings: 'settings', password: 'password'
+  users: 'users', settings: 'settings', system: 'system', password: 'password'
 };
 
 // ==================================================================
@@ -392,7 +437,6 @@ function api(action, data) {
       resolve(result);
     };
     const timeoutId = setTimeout(() => done({ success: false, message: 'Timeout 45s. Periksa deployment.' }), 45000);
-
     const inGAS = (typeof google !== 'undefined' && google.script && google.script.run);
     if (inGAS) {
       try {
@@ -402,9 +446,7 @@ function api(action, data) {
             try {
               const result = typeof response === 'string' ? JSON.parse(response) : response;
               done(result || { success: false, message: 'Respons kosong' });
-            } catch (err) {
-              done({ success: false, message: 'Respons tidak valid: ' + err.message });
-            }
+            } catch (err) { done({ success: false, message: 'Respons tidak valid: ' + err.message }); }
           })
           .withFailureHandler((error) => {
             clearTimeout(timeoutId);
@@ -417,13 +459,11 @@ function api(action, data) {
       }
       return;
     }
-
     if (!WEB_APP_URL || WEB_APP_URL.indexOf('script.google.com') === -1) {
       clearTimeout(timeoutId);
       done({ success: false, message: 'WEB_APP_URL belum diisi di index.html. Ganti dengan URL /exec Anda.' });
       return;
     }
-
     fetch(WEB_APP_URL, {
       method: 'POST', mode: 'cors', redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -480,7 +520,7 @@ function roleLabel(role) {
 }
 
 // ==================================================================
-// RBAC HELPERS
+// RBAC
 // ==================================================================
 function can(module, action) {
   if (!currentUser) return false;
@@ -494,7 +534,7 @@ function applyRBACToSidebar() {
   document.querySelectorAll('.nav-item').forEach(nav => {
     const page = nav.dataset.page;
     if (page === 'password' || page === 'dashboard') { nav.style.display = 'flex'; return; }
-    if (page === 'users' || page === 'settings') {
+    if (page === 'users' || page === 'settings' || page === 'system') {
       nav.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
       return;
     }
@@ -581,14 +621,11 @@ async function initApp() {
 }
 
 function navigate(page) {
-  if (page === 'users' && currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error'); return;
-  }
-  if (page === 'settings' && currentUser.role !== 'admin') {
-    toast('Akses ditolak. Hanya administrator.', 'error'); return;
-  }
+  if (page === 'users' && currentUser.role !== 'admin') { toast('Akses ditolak. Hanya administrator.', 'error'); return; }
+  if (page === 'settings' && currentUser.role !== 'admin') { toast('Akses ditolak. Hanya administrator.', 'error'); return; }
+  if (page === 'system' && currentUser.role !== 'admin') { toast('Akses ditolak. Hanya administrator.', 'error'); return; }
   const module = PAGE_TO_MODULE[page];
-  if (page !== 'password' && page !== 'dashboard' && module && !can(module, 'view')) {
+  if (page !== 'password' && page !== 'dashboard' && page !== 'system' && module && !can(module, 'view')) {
     toast('Akses ditolak. Role Anda tidak memiliki izin.', 'error'); return;
   }
 
@@ -605,7 +642,7 @@ function navigate(page) {
     budget: loadBudget, finance: loadFinance, evm: loadEVM,
     reports: loadReports, changes: loadChanges, resources: loadResources,
     qc: loadQC, hse: loadHSE, documents: loadDocuments, users: loadUsers,
-    settings: loadSettings, password: () => {}
+    settings: loadSettings, system: loadSystemPage, password: () => {}
   };
   if (loaders[page]) { try { loaders[page](); } catch (e) { console.error(e); } }
 }
@@ -703,7 +740,7 @@ async function saveProject(id) {
   };
   if (!data.kode || !data.nama) { toast('Kode & nama wajib', 'error'); return; }
   const res = await api('saveProject', data);
-  if (res && res.success) { toast('Proyek tersimpan', 'success'); closeModal(); await loadProjects(); loadProjectsPage(); }
+  if (res && res.success) { toast('Tersimpan', 'success'); closeModal(); await loadProjects(); loadProjectsPage(); }
   else toast((res && res.message) || 'Gagal', 'error');
 }
 
@@ -1245,21 +1282,18 @@ async function saveDocument() {
 async function loadUsers() {
   const t = document.getElementById('usersTable');
   const btn = document.getElementById('btnAddUser');
-
   if (!currentUser || currentUser.role !== 'admin') {
     t.innerHTML = '<tr><td><div class="empty"><div class="lock-icon">🔒</div>Akses ditolak.<br>Hanya administrator.</div></td></tr>';
     if (btn) btn.style.display = 'none';
     return;
   }
   if (btn) btn.style.display = 'inline-flex';
-
   const res = await api('getUsers', { adminId: currentUser.id });
   if (!res || !res.success) {
     t.innerHTML = '<tr><td><div class="empty">' + esc((res && res.message) || 'Gagal') + '</div></td></tr>';
     return;
   }
   usersCache = res.data || [];
-
   t.innerHTML = '<thead><tr><th>Username</th><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>' +
     usersCache.map(u => {
       const isSelf = u.id === currentUser.id;
@@ -1357,7 +1391,7 @@ async function openPermissionsModal() {
   document.getElementById('modalTitle').textContent = '🔐 Hak Akses Role';
   document.getElementById('modalBox').classList.add('wide');
 
-  let html = '<p style="margin-bottom:16px;font-size:13px;color:#64748b">Atur izin per role dan modul. Role <b>admin</b> selalu full access. Menu <b>users</b> & <b>settings</b> hanya admin.</p>';
+  let html = '<p style="margin-bottom:16px;font-size:13px;color:#64748b">Atur izin per role dan modul. Role <b>admin</b> selalu full access. Menu <b>users</b>, <b>settings</b>, <b>system</b> hanya admin.</p>';
 
   roles.forEach(role => {
     html += '<div class="perm-role-title">👤 ' + esc(role) + '</div>';
@@ -1400,10 +1434,8 @@ async function savePermissionsFromModal() {
     });
   });
   const res = await api('savePermissions', { adminId: currentUser.id, permissions });
-  if (res && res.success) {
-    toast('Hak akses tersimpan', 'success');
-    closeModal();
-  } else toast((res && res.message) || 'Gagal', 'error');
+  if (res && res.success) { toast('Hak akses tersimpan', 'success'); closeModal(); }
+  else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
@@ -1432,6 +1464,88 @@ async function saveSettings() {
     toast('Tersimpan', 'success');
     settingsCache = Object.assign({}, settingsCache, data);
   }
+}
+
+// ==================================================================
+// SYSTEM SETTINGS (SEED / RESET / BACKUP / RESTORE)
+// ==================================================================
+async function loadSystemPage() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  const [dash, users] = await Promise.all([
+    api('getDashboard', {}),
+    api('getUsers', { adminId: currentUser.id })
+  ]);
+  const d = (dash && dash.data) || {};
+  const userCount = (users && users.success && users.data) ? users.data.length : 0;
+  document.getElementById('systemStats').innerHTML =
+    '<div class="stat-card blue"><div class="label">Proyek</div><div class="value">' + (d.totalProjects || 0) + '</div></div>' +
+    '<div class="stat-card green"><div class="label">User Terdaftar</div><div class="value">' + userCount + '</div></div>' +
+    '<div class="stat-card orange"><div class="label">Total Pemasukan</div><div class="value">' + fmtRp(d.totalIncome) + '</div></div>' +
+    '<div class="stat-card red"><div class="label">Total Pengeluaran</div><div class="value">' + fmtRp(d.totalExpense) + '</div></div>' +
+    '<div class="stat-card blue"><div class="label">Laporan Harian</div><div class="value">' + (d.totalReports || 0) + '</div></div>';
+}
+
+async function doSeedData() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  if (!confirm('Tambahkan data contoh ke aplikasi?\n\nAkan ditambahkan: 2 proyek, 16 WBS, 12 RAB, 12 transaksi, 7 laporan, 3 CO, 4 QC, 4 HSE, 11 resource, 7 dokumen.\n\nData lama TIDAK dihapus.')) return;
+  const res = await api('seedDemoData', { adminId: currentUser.id });
+  if (res && res.success) {
+    toast(res.message || 'Data contoh ditambahkan', 'success');
+    await loadProjects();
+    loadSystemPage();
+  } else toast((res && res.message) || 'Gagal', 'error');
+}
+
+async function doBackup() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  toast('Menyiapkan backup...', 'info');
+  const res = await api('backupDatabase', { adminId: currentUser.id });
+  if (!res || !res.success) { toast((res && res.message) || 'Gagal backup', 'error'); return; }
+  const jsonStr = JSON.stringify(res.data, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = res.filename || ('simplekon_backup_' + new Date().toISOString().substring(0, 10) + '.json');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Backup berhasil di-download', 'success');
+}
+
+async function doRestore() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  const fileInput = document.getElementById('restoreFile');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) { toast('Pilih file backup terlebih dahulu', 'error'); return; }
+  const mode = val('restoreMode') || 'replace';
+  const modeLabel = mode === 'replace' ? 'REPLACE (hapus data lama)' : 'MERGE (tambahkan)';
+  if (!confirm('Restore data dari file "' + file.name + '"?\n\nMode: ' + modeLabel + '\n\nLanjutkan?')) return;
+  let backupData;
+  try {
+    const text = await file.text();
+    backupData = JSON.parse(text);
+  } catch (e) { toast('File bukan JSON valid: ' + e.message, 'error'); return; }
+  if (!backupData.sheets) { toast('File backup tidak valid (missing sheets)', 'error'); return; }
+  const res = await api('restoreDatabase', { adminId: currentUser.id, backup: backupData, mode });
+  if (res && res.success) {
+    toast(res.message || 'Restore berhasil', 'success');
+    await loadProjects();
+    loadSystemPage();
+  } else toast((res && res.message) || 'Gagal restore', 'error');
+}
+
+async function doReset() {
+  if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
+  if (!confirm('⚠️ PERINGATAN ⚠️\n\nSemua data proyek, WBS, RAB, transaksi, laporan, CO, QC, HSE, resource, dokumen akan DIHAPUS PERMANEN.\n\nUser & pengaturan perusahaan tetap dipertahankan.\n\nLanjutkan?')) return;
+  if (!confirm('Yakin 100%? Tindakan ini TIDAK DAPAT DIBATALKAN.')) return;
+  const res = await api('resetDatabase', { adminId: currentUser.id });
+  if (res && res.success) {
+    toast(res.message || 'Reset berhasil', 'success');
+    await loadProjects();
+    loadSystemPage();
+  } else toast((res && res.message) || 'Gagal', 'error');
 }
 
 // ==================================================================
