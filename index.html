@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIMPLE-KON: Sistem Manajemen Proyek Konstruksi</title>
+<title>SIMPLE-KON v1.3: Sistem Manajemen Proyek Konstruksi</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif}
@@ -30,7 +30,6 @@ body{background:#f0f4f8;color:#1e293b}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .alert{padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px}
 .alert-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-.alert-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
 .app{display:none;min-height:100vh;flex-direction:column}
 .app.active{display:flex}
 .topbar{background:var(--primary);color:#fff;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.15);position:sticky;top:0;z-index:100}
@@ -141,7 +140,7 @@ tr:hover td{background:#f8fafc}
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:12px">
       <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('show')">☰</button>
-      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.2</span></div>
+      <div class="logo">🏗️ SIMPLE-KON <span class="logo-badge">v1.3</span></div>
     </div>
     <div class="user-info">
       <div class="avatar" id="userAvatar">A</div>
@@ -163,6 +162,9 @@ tr:hover td{background:#f8fafc}
       <div class="nav-item" data-page="finance">💵 Arus Kas</div>
       <div class="nav-item" data-page="evm">📈 EVM / S-Curve</div>
       <div class="nav-section">LAPANGAN</div>
+      <div class="nav-item" data-page="workers">👷 Data Pekerja</div>
+      <div class="nav-item" data-page="teams">👥 Tim Proyek</div>
+      <div class="nav-item" data-page="attendance">📋 Absensi Harian</div>
       <div class="nav-item" data-page="reports">📝 Laporan Harian</div>
       <div class="nav-item" data-page="changes">🔄 Change Order</div>
       <div class="nav-item" data-page="resources">🚜 Alat & Material</div>
@@ -239,6 +241,40 @@ tr:hover td{background:#f8fafc}
         </div>
         <div class="stats-grid" id="evmStats"></div>
         <div class="card"><h3>📈 Kurva-S (Progress Plan vs Actual)</h3><div class="chart-container"><canvas id="scurveChart"></canvas></div></div>
+      </div>
+
+      <div class="page" id="page-workers">
+        <div class="page-header">
+          <div><h2>Data Pekerja</h2><p>Data master pekerja / tenaga kerja lapangan</p></div>
+          <button class="btn btn-primary btn-sm" onclick="openWorkerModal()">➕ Tambah Pekerja</button>
+        </div>
+        <div class="card"><div class="table-wrapper"><table id="workersTable"></table></div></div>
+      </div>
+
+      <div class="page" id="page-teams">
+        <div class="page-header">
+          <div><h2>Tim Proyek</h2><p>Penugasan pekerja ke proyek</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select class="project-selector" id="teamProject" onchange="loadTeams()"></select>
+            <button class="btn btn-primary btn-sm" onclick="openTeamModal()">➕ Tugaskan Pekerja</button>
+          </div>
+        </div>
+        <div class="card"><div class="table-wrapper"><table id="teamsTable"></table></div></div>
+      </div>
+
+      <div class="page" id="page-attendance">
+        <div class="page-header">
+          <div><h2>Absensi Harian</h2><p>Pencatatan kehadiran & upah pekerja</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select class="project-selector" id="attProject" onchange="loadAttendance()"></select>
+            <input type="date" class="project-selector" id="attDate" onchange="loadAttendance()" style="min-width:150px">
+            <button class="btn btn-primary btn-sm" onclick="openAttendanceModal()">➕ Absensi</button>
+            <button class="btn btn-outline btn-sm" onclick="bulkAttendance()">📋 Absensi Massal</button>
+            <button class="btn btn-outline btn-sm" onclick="printAttendance()">🖨️ Print</button>
+          </div>
+        </div>
+        <div class="stats-grid" id="attendanceStats"></div>
+        <div class="card"><div class="table-wrapper"><table id="attendanceTable"></table></div></div>
       </div>
 
       <div class="page" id="page-reports">
@@ -336,42 +372,28 @@ tr:hover td{background:#f8fafc}
         <div class="page-header">
           <div><h2>Pengaturan Sistem</h2><p>Kelola data aplikasi — seed, reset, backup, restore (khusus administrator)</p></div>
         </div>
-
         <div class="stats-grid" id="systemStats"></div>
-
         <div class="card">
           <h3>🧪 Data Contoh</h3>
-          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Tambahkan data contoh lengkap (2 proyek, 16 WBS, 12 RAB, 12 transaksi, 7 laporan, 3 CO, 4 QC, 4 HSE, 11 resource, 7 dokumen) untuk demonstrasi.</p>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Tambahkan data contoh lengkap (2 proyek, 10 pekerja, 11 tim, 35 absensi, WBS, RAB, transaksi, laporan, dll).</p>
           <button class="btn btn-primary" style="width:auto" onclick="doSeedData()">➕ Tambahkan Data Contoh</button>
         </div>
-
         <div class="card">
           <h3>💾 Backup Database</h3>
-          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Download semua data aplikasi (kecuali password user) dalam format JSON. Simpan file ini untuk restore di masa depan.</p>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Download semua data aplikasi dalam format JSON.</p>
           <button class="btn btn-primary" style="width:auto" onclick="doBackup()">⬇️ Download Backup (JSON)</button>
         </div>
-
         <div class="card">
           <h3>📤 Restore Database</h3>
-          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Upload file backup JSON. Mode <b>replace</b> menghapus semua data lama, mode <b>merge</b> menambahkan ke data yang ada.</p>
-          <div class="form-group">
-            <label>File Backup (.json)</label>
-            <input type="file" id="restoreFile" accept=".json,application/json">
-          </div>
-          <div class="form-group">
-            <label>Mode Restore</label>
-            <select id="restoreMode">
-              <option value="replace">Replace — Hapus semua data lama, ganti dengan backup</option>
-              <option value="merge">Merge — Tambahkan data backup ke data yang ada</option>
-            </select>
-          </div>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Upload file backup JSON.</p>
+          <div class="form-group"><label>File Backup (.json)</label><input type="file" id="restoreFile" accept=".json,application/json"></div>
+          <div class="form-group"><label>Mode Restore</label><select id="restoreMode"><option value="replace">Replace — Hapus data lama</option><option value="merge">Merge — Tambahkan</option></select></div>
           <button class="btn btn-primary" style="width:auto" onclick="doRestore()">📥 Restore dari File</button>
         </div>
-
         <div class="card danger-zone">
           <h3 style="color:#dc2626">⚠️ Zona Berbahaya</h3>
-          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Hapus <b>SEMUA data</b> proyek, transaksi, WBS, RAB, laporan, dll. User & pengaturan perusahaan tetap dipertahankan. <b>Tindakan ini tidak dapat dibatalkan.</b></p>
-          <button class="btn" style="background:#dc2626;color:#fff;width:auto" onclick="doReset()">🗑️ Reset Semua Data Proyek</button>
+          <p style="font-size:13px;color:#64748b;margin-bottom:12px">Hapus semua data proyek, tim, pekerja, transaksi. User & pengaturan tetap ada.</p>
+          <button class="btn" style="background:#dc2626;color:#fff;width:auto" onclick="doReset()">🗑️ Reset Semua Data</button>
         </div>
       </div>
 
@@ -400,9 +422,9 @@ tr:hover td{background:#f8fafc}
 
 <script>
 // ==================================================================
-// ⚠️ KONFIGURASI WAJIB: Ganti dengan URL Web App Apps Script Anda
+// ⚠️ KONFIGURASI WAJIB
 // ==================================================================
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzO4K6n7izpVz7HxlENWVjE-MY1cJ9przjA2mps69-pboy6DmhulUU33aaZx4_TgU5x/exec';
+const WEB_APP_URL = 'GANTI_DENGAN_URL_WEB_APP_ANDA';
 
 // ==================================================================
 // STATE
@@ -415,11 +437,15 @@ let cashflowChartInstance = null;
 let scurveChartInstance = null;
 let settingsCache = {};
 let usersCache = [];
+let workersCache = [];
+let teamsCache = [];
+let attendanceCache = [];
 
 const PAGE_TO_MODULE = {
   dashboard: 'projects', projects: 'projects', wbs: 'wbs', budget: 'budget',
   finance: 'finance', evm: 'evm', reports: 'reports', changes: 'changes',
   resources: 'resources', qc: 'qc', hse: 'hse', documents: 'documents',
+  workers: 'workers', teams: 'teams', attendance: 'attendance',
   users: 'users', settings: 'settings', system: 'system', password: 'password'
 };
 
@@ -641,8 +667,9 @@ function navigate(page) {
     dashboard: loadDashboard, projects: loadProjectsPage, wbs: loadWBS,
     budget: loadBudget, finance: loadFinance, evm: loadEVM,
     reports: loadReports, changes: loadChanges, resources: loadResources,
-    qc: loadQC, hse: loadHSE, documents: loadDocuments, users: loadUsers,
-    settings: loadSettings, system: loadSystemPage, password: () => {}
+    qc: loadQC, hse: loadHSE, documents: loadDocuments,
+    workers: loadWorkers, teams: loadTeamsPage, attendance: loadAttendancePage,
+    users: loadUsers, settings: loadSettings, system: loadSystemPage, password: () => {}
   };
   if (loaders[page]) { try { loaders[page](); } catch (e) { console.error(e); } }
 }
@@ -653,7 +680,7 @@ function navigate(page) {
 async function loadProjects() {
   const res = await api('getProjects', {});
   currentProjects = (res && res.data) || [];
-  const selectors = ['wbsProject','budgetProject','financeProject','evmProject','reportProject','changeProject','resourceProject','qcProject','hseProject','docProject'];
+  const selectors = ['wbsProject','budgetProject','financeProject','evmProject','reportProject','changeProject','resourceProject','qcProject','hseProject','docProject','teamProject','attProject'];
   selectors.forEach(id => {
     const sel = document.getElementById(id);
     if (sel) {
@@ -764,7 +791,8 @@ async function loadDashboard() {
     '<div class="stat-card orange"><div class="label">Total Pemasukan</div><div class="value">' + fmtRp(d.totalIncome) + '</div></div>' +
     '<div class="stat-card red"><div class="label">Total Pengeluaran</div><div class="value">' + fmtRp(d.totalExpense) + '</div></div>' +
     '<div class="stat-card blue"><div class="label">Saldo Kas</div><div class="value">' + fmtRp(d.saldo) + '</div></div>' +
-    '<div class="stat-card green"><div class="label">Laporan Harian</div><div class="value">' + (d.totalReports || 0) + '</div></div>' +
+    '<div class="stat-card green"><div class="label">Pekerja Aktif</div><div class="value">' + (d.totalWorkers || 0) + '</div></div>' +
+    '<div class="stat-card orange"><div class="label">Laporan Harian</div><div class="value">' + (d.totalReports || 0) + '</div></div>' +
     '<div class="stat-card red"><div class="label">Insiden K3</div><div class="value">' + (d.totalIncidents || 0) + '</div></div>';
 
   const po = document.getElementById('projectsOverview');
@@ -1000,6 +1028,345 @@ async function loadEVM() {
       options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
     });
   }
+}
+
+// ==================================================================
+// WORKERS
+// ==================================================================
+async function loadWorkers() {
+  toggleCreateButton('#page-workers .btn-primary', 'workers');
+  const t = document.getElementById('workersTable');
+  const res = await api('getWorkers', {});
+  workersCache = (res && res.data) || [];
+  if (!workersCache.length) {
+    t.innerHTML = '<tr><td><div class="empty">Belum ada data pekerja.</div></td></tr>';
+    return;
+  }
+  const canEdit = can('workers','edit');
+  const canDel = can('workers','delete');
+  t.innerHTML = '<thead><tr><th>NIK</th><th>Nama</th><th>Jabatan</th><th>Keahlian</th><th>Telepon</th><th>Upah/Hari</th><th>Status</th><th>Aksi</th></tr></thead><tbody>' +
+    workersCache.map(w => {
+      const statusClass = w.status === 'Aktif' ? 'badge-success' : 'badge-gray';
+      return '<tr>' +
+        '<td><b>' + esc(w.nik || '-') + '</b></td>' +
+        '<td>' + esc(w.nama) + '</td>' +
+        '<td>' + esc(w.jabatan || '-') + '</td>' +
+        '<td>' + esc(w.keahlian || '-') + '</td>' +
+        '<td>' + esc(w.telepon || '-') + '</td>' +
+        '<td>' + fmtRp(w.upah_harian) + '</td>' +
+        '<td><span class="badge ' + statusClass + '">' + esc(w.status) + '</span></td>' +
+        '<td>' + (canEdit ? '<button class="btn btn-sm btn-outline" onclick="editWorker(\'' + esc(w.id) + '\')">✏️</button> ' : '') +
+              (canDel ? '<button class="btn btn-sm btn-danger" onclick="delWorker(\'' + esc(w.id) + '\')">🗑️</button>' : '') + '</td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
+}
+
+function openWorkerModal(data) {
+  if (!can('workers', data ? 'edit' : 'create')) { toast('Akses ditolak', 'error'); return; }
+  const w = data || {};
+  document.getElementById('modalTitle').textContent = data ? 'Edit Pekerja' : 'Tambah Pekerja';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="form-row">' +
+      '<div class="form-group"><label>NIK</label><input id="wNIK" value="' + esc(w.nik || '') + '"></div>' +
+      '<div class="form-group"><label>Status</label><select id="wStatus">' +
+        '<option ' + (w.status === 'Aktif' ? 'selected' : '') + '>Aktif</option>' +
+        '<option ' + (w.status === 'Nonaktif' ? 'selected' : '') + '>Nonaktif</option>' +
+      '</select></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Nama Lengkap *</label><input id="wNama" value="' + esc(w.nama || '') + '"></div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Jabatan</label><input id="wJabatan" value="' + esc(w.jabatan || '') + '" placeholder="Mandor/Tukang/Pekerja"></div>' +
+      '<div class="form-group"><label>Keahlian</label><input id="wKeahlian" value="' + esc(w.keahlian || '') + '" placeholder="Struktur/MEP/Jalan"></div>' +
+    '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Telepon</label><input id="wTelepon" value="' + esc(w.telepon || '') + '"></div>' +
+      '<div class="form-group"><label>Upah Harian (Rp)</label><input type="number" id="wUpah" value="' + (Number(w.upah_harian) || 0) + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Alamat</label><textarea id="wAlamat" rows="2">' + esc(w.alamat || '') + '</textarea></div>' +
+    '<div class="form-group"><label>Tanggal Masuk</label><input type="date" id="wTglMasuk" value="' + esc(w.tgl_masuk || '') + '"></div>';
+  document.getElementById('modalFooter').innerHTML =
+    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+    '<button class="btn btn-primary" style="width:auto" onclick="saveWorker(\'' + esc(w.id || '') + '\')">💾 Simpan</button>';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function editWorker(id) {
+  const w = workersCache.find(x => x.id === id);
+  if (w) openWorkerModal(w);
+}
+
+async function saveWorker(id) {
+  if (id && !can('workers','edit')) { toast('Akses ditolak', 'error'); return; }
+  if (!id && !can('workers','create')) { toast('Akses ditolak', 'error'); return; }
+  const data = {
+    id: id || '', nik: val('wNIK'), nama: val('wNama'),
+    jabatan: val('wJabatan'), keahlian: val('wKeahlian'),
+    telepon: val('wTelepon'), alamat: val('wAlamat'),
+    tgl_masuk: val('wTglMasuk'), upah_harian: val('wUpah'), status: val('wStatus')
+  };
+  if (!data.nama) { toast('Nama wajib', 'error'); return; }
+  const res = await api('saveWorker', data);
+  if (res && res.success) { toast('Pekerja tersimpan', 'success'); closeModal(); loadWorkers(); }
+  else toast((res && res.message) || 'Gagal', 'error');
+}
+
+async function delWorker(id) {
+  if (!can('workers','delete')) { toast('Akses ditolak', 'error'); return; }
+  const w = workersCache.find(x => x.id === id);
+  if (!confirm('Hapus pekerja "' + (w ? w.nama : '') + '"?\n\nSemua penugasan & absensinya juga akan dihapus.')) return;
+  const res = await api('deleteWorker', { adminId: currentUser.id, id });
+  if (res && res.success) { toast(res.message || 'Terhapus', 'success'); loadWorkers(); }
+  else toast((res && res.message) || 'Gagal', 'error');
+}
+
+// ==================================================================
+// TEAMS
+// ==================================================================
+async function loadTeamsPage() {
+  toggleCreateButton('#page-teams .btn-primary', 'teams');
+  const sel = document.getElementById('teamProject');
+  if (sel) {
+    sel.innerHTML = '<option value="">-- Pilih Proyek --</option>' +
+      currentProjects.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nama) + '</option>').join('');
+  }
+  const wr = await api('getWorkers', {});
+  workersCache = (wr && wr.data) || [];
+  loadTeams();
+}
+
+async function loadTeams() {
+  const pid = val('teamProject');
+  const t = document.getElementById('teamsTable');
+  if (!pid) { t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return; }
+  const res = await api('getTeams', { projectId: pid });
+  teamsCache = (res && res.data) || [];
+  if (!teamsCache.length) {
+    t.innerHTML = '<tr><td><div class="empty">Belum ada pekerja ditugaskan.</div></td></tr>';
+    return;
+  }
+  const canDel = can('teams','delete');
+  t.innerHTML = '<thead><tr><th>NIK</th><th>Nama</th><th>Jabatan</th><th>Posisi di Proyek</th><th>Tgl Mulai</th><th>Status</th><th>Upah/Hari</th><th>Aksi</th></tr></thead><tbody>' +
+    teamsCache.map(tm => {
+      const statusClass = tm.status === 'Aktif' ? 'badge-success' : 'badge-gray';
+      return '<tr>' +
+        '<td>' + esc(tm.nik_worker || '-') + '</td>' +
+        '<td><b>' + esc(tm.nama_worker || '-') + '</b></td>' +
+        '<td>' + esc(tm.jabatan_worker || '-') + '</td>' +
+        '<td>' + esc(tm.posisi || '-') + '</td>' +
+        '<td>' + esc(tm.tgl_mulai || '-') + '</td>' +
+        '<td><span class="badge ' + statusClass + '">' + esc(tm.status) + '</span></td>' +
+        '<td>' + fmtRp(tm.upah_harian) + '</td>' +
+        '<td>' + (canDel ? '<button class="btn btn-sm btn-danger" onclick="delTeam(\'' + esc(tm.id) + '\')">🗑️</button>' : '') + '</td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
+}
+
+async function openTeamModal() {
+  if (!can('teams','create')) { toast('Akses ditolak', 'error'); return; }
+  if (!val('teamProject')) { toast('Pilih proyek', 'error'); return; }
+  if (!workersCache.length) { toast('Belum ada pekerja. Tambah dulu di menu "Data Pekerja".', 'error'); return; }
+  document.getElementById('modalTitle').textContent = 'Tugaskan Pekerja';
+  const workerOptions = workersCache.filter(w => w.status === 'Aktif').map(w =>
+    '<option value="' + esc(w.id) + '">' + esc(w.nama) + ' (' + esc(w.jabatan || '-') + ')</option>'
+  ).join('');
+  document.getElementById('modalBody').innerHTML =
+    '<div class="form-group"><label>Pilih Pekerja *</label><select id="tmWorker">' +
+      '<option value="">-- Pilih Pekerja --</option>' + workerOptions + '</select></div>' +
+    '<div class="form-group"><label>Posisi di Proyek</label><input id="tmPosisi" placeholder="Mandor/Tukang/Helper"></div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Tgl Mulai</label><input type="date" id="tmMulai" value="' + today() + '"></div>' +
+      '<div class="form-group"><label>Status</label><select id="tmStatus"><option>Aktif</option><option>Selesai</option></select></div>' +
+    '</div>';
+  document.getElementById('modalFooter').innerHTML =
+    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+    '<button class="btn btn-primary" style="width:auto" onclick="saveTeam()">💾 Tugaskan</button>';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function saveTeam() {
+  if (!can('teams','create')) { toast('Akses ditolak', 'error'); return; }
+  const data = {
+    project_id: val('teamProject'), worker_id: val('tmWorker'),
+    posisi: val('tmPosisi'), tgl_mulai: val('tmMulai'), status: val('tmStatus')
+  };
+  if (!data.worker_id) { toast('Pilih pekerja', 'error'); return; }
+  const res = await api('saveTeam', data);
+  if (res && res.success) { toast('Pekerja ditugaskan', 'success'); closeModal(); loadTeams(); }
+  else toast((res && res.message) || 'Gagal', 'error');
+}
+
+async function delTeam(id) {
+  if (!can('teams','delete')) { toast('Akses ditolak', 'error'); return; }
+  if (!confirm('Hapus penugasan ini?')) return;
+  const res = await api('deleteTeam', { id });
+  if (res && res.success) { toast('Terhapus', 'success'); loadTeams(); }
+}
+
+// ==================================================================
+// ATTENDANCE
+// ==================================================================
+async function loadAttendancePage() {
+  toggleCreateButton('#page-attendance .btn-primary', 'attendance');
+  const sel = document.getElementById('attProject');
+  if (sel) {
+    sel.innerHTML = '<option value="">-- Pilih Proyek --</option>' +
+      currentProjects.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nama) + '</option>').join('');
+  }
+  const dateInput = document.getElementById('attDate');
+  if (dateInput && !dateInput.value) dateInput.value = today();
+  loadAttendance();
+}
+
+async function loadAttendance() {
+  const pid = val('attProject');
+  const tgl = val('attDate');
+  const t = document.getElementById('attendanceTable');
+  if (!pid) {
+    document.getElementById('attendanceStats').innerHTML = '';
+    t.innerHTML = '<tr><td><div class="empty">Pilih proyek</div></td></tr>'; return;
+  }
+  const res = await api('getAttendance', { projectId: pid, tanggal: tgl });
+  attendanceCache = (res && res.data) || [];
+  const hadir = attendanceCache.filter(a => a.status === 'Hadir').length;
+  const izin = attendanceCache.filter(a => a.status === 'Izin').length;
+  const sakit = attendanceCache.filter(a => a.status === 'Sakit').length;
+  const alpha = attendanceCache.filter(a => a.status === 'Alpha').length;
+  const totalUpah = attendanceCache.reduce((s, a) => s + (Number(a.upah) || 0), 0);
+  document.getElementById('attendanceStats').innerHTML =
+    '<div class="stat-card green"><div class="label">Hadir</div><div class="value">' + hadir + '</div></div>' +
+    '<div class="stat-card orange"><div class="label">Izin / Sakit</div><div class="value">' + (izin + sakit) + '</div></div>' +
+    '<div class="stat-card red"><div class="label">Alpha</div><div class="value">' + alpha + '</div></div>' +
+    '<div class="stat-card blue"><div class="label">Total Upah</div><div class="value">' + fmtRp(totalUpah) + '</div></div>';
+  if (!attendanceCache.length) {
+    t.innerHTML = '<tr><td><div class="empty">Belum ada absensi untuk tanggal ini.</div></td></tr>';
+    return;
+  }
+  const canDel = can('attendance','delete');
+  t.innerHTML = '<thead><tr><th>Tanggal</th><th>Nama</th><th>Jabatan</th><th>Status</th><th>Masuk</th><th>Keluar</th><th>Lembur</th><th>Upah</th><th>Keterangan</th><th>Aksi</th></tr></thead><tbody>' +
+    attendanceCache.map(a => {
+      const statusClass = a.status === 'Hadir' ? 'badge-success' : a.status === 'Izin' ? 'badge-warning' : a.status === 'Sakit' ? 'badge-info' : 'badge-danger';
+      return '<tr>' +
+        '<td>' + esc(a.tanggal) + '</td>' +
+        '<td><b>' + esc(a.nama_worker || '-') + '</b></td>' +
+        '<td>' + esc(a.jabatan_worker || '-') + '</td>' +
+        '<td><span class="badge ' + statusClass + '">' + esc(a.status) + '</span></td>' +
+        '<td>' + esc(a.jam_masuk || '-') + '</td>' +
+        '<td>' + esc(a.jam_keluar || '-') + '</td>' +
+        '<td>' + (a.jam_lembur || 0) + '</td>' +
+        '<td>' + fmtRp(a.upah) + '</td>' +
+        '<td>' + esc(a.keterangan || '-') + '</td>' +
+        '<td>' + (canDel ? '<button class="btn btn-sm btn-danger" onclick="delAttendance(\'' + esc(a.id) + '\')">🗑️</button>' : '') + '</td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
+}
+
+async function openAttendanceModal(data) {
+  if (!can('attendance', data ? 'edit' : 'create')) { toast('Akses ditolak', 'error'); return; }
+  const pid = val('attProject');
+  if (!pid) { toast('Pilih proyek', 'error'); return; }
+  const workersRes = await api('getWorkers', {});
+  workersCache = (workersRes && workersRes.data) || [];
+  if (!workersCache.length) { toast('Belum ada pekerja', 'error'); return; }
+  const a = data || {};
+  document.getElementById('modalTitle').textContent = data ? 'Edit Absensi' : 'Absensi Baru';
+  const workerOptions = workersCache.filter(w => w.status === 'Aktif').map(w =>
+    '<option value="' + esc(w.id) + '" ' + (a.worker_id === w.id ? 'selected' : '') + '>' +
+      esc(w.nama) + ' (' + esc(w.jabatan || '-') + ')</option>'
+  ).join('');
+  document.getElementById('modalBody').innerHTML =
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Tanggal *</label><input type="date" id="atTgl" value="' + (a.tanggal || val('attDate') || today()) + '"></div>' +
+      '<div class="form-group"><label>Status *</label><select id="atStatus">' +
+        '<option ' + (a.status === 'Hadir' ? 'selected' : '') + '>Hadir</option>' +
+        '<option ' + (a.status === 'Izin' ? 'selected' : '') + '>Izin</option>' +
+        '<option ' + (a.status === 'Sakit' ? 'selected' : '') + '>Sakit</option>' +
+        '<option ' + (a.status === 'Alpha' ? 'selected' : '') + '>Alpha</option>' +
+      '</select></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Pekerja *</label><select id="atWorker">' +
+      '<option value="">-- Pilih Pekerja --</option>' + workerOptions + '</select></div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Jam Masuk</label><input type="time" id="atMasuk" value="' + esc(a.jam_masuk || '08:00') + '"></div>' +
+      '<div class="form-group"><label>Jam Keluar</label><input type="time" id="atKeluar" value="' + esc(a.jam_keluar || '17:00') + '"></div>' +
+    '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label>Jam Lembur</label><input type="number" id="atLembur" value="' + (Number(a.jam_lembur) || 0) + '" min="0" step="0.5"></div>' +
+      '<div class="form-group"><label>Upah (Rp)</label><input type="number" id="atUpah" value="' + (Number(a.upah) || 0) + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Keterangan</label><input id="atKet" value="' + esc(a.keterangan || '') + '"></div>';
+  document.getElementById('modalFooter').innerHTML =
+    '<button class="btn btn-outline" onclick="closeModal()">Batal</button>' +
+    '<button class="btn btn-primary" style="width:auto" onclick="saveAttendance(\'' + esc(a.id || '') + '\')">💾 Simpan</button>';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function saveAttendance(id) {
+  if (id && !can('attendance','edit')) { toast('Akses ditolak', 'error'); return; }
+  if (!id && !can('attendance','create')) { toast('Akses ditolak', 'error'); return; }
+  const data = {
+    id: id || '', project_id: val('attProject'),
+    worker_id: val('atWorker'), tanggal: val('atTgl'), status: val('atStatus'),
+    jam_masuk: val('atMasuk'), jam_keluar: val('atKeluar'),
+    jam_lembur: val('atLembur'), upah: val('atUpah'), keterangan: val('atKet')
+  };
+  if (!data.worker_id) { toast('Pilih pekerja', 'error'); return; }
+  if (!data.tanggal) { toast('Tanggal wajib', 'error'); return; }
+  const res = await api('saveAttendance', data);
+  if (res && res.success) { toast('Absensi tersimpan', 'success'); closeModal(); loadAttendance(); }
+  else toast((res && res.message) || 'Gagal', 'error');
+}
+
+async function delAttendance(id) {
+  if (!can('attendance','delete')) { toast('Akses ditolak', 'error'); return; }
+  if (!confirm('Hapus absensi ini?')) return;
+  const res = await api('deleteAttendance', { id });
+  if (res && res.success) { toast('Terhapus', 'success'); loadAttendance(); }
+}
+
+async function bulkAttendance() {
+  if (!can('attendance','create')) { toast('Akses ditolak', 'error'); return; }
+  const pid = val('attProject');
+  const tgl = val('attDate');
+  if (!pid) { toast('Pilih proyek', 'error'); return; }
+  if (!tgl) { toast('Pilih tanggal', 'error'); return; }
+  const teamsRes = await api('getTeams', { projectId: pid });
+  const teams = (teamsRes && teamsRes.data) || [];
+  if (!teams.length) { toast('Belum ada tim ditugaskan di proyek ini', 'error'); return; }
+  if (!confirm('Buat absensi massal untuk ' + teams.length + ' pekerja aktif pada tanggal ' + tgl + '?\n\nStatus default: Hadir, jam masuk 08:00, keluar 17:00.')) return;
+  let success = 0;
+  for (const tm of teams) {
+    const data = {
+      project_id: pid, worker_id: tm.worker_id, tanggal: tgl,
+      status: 'Hadir', jam_masuk: '08:00', jam_keluar: '17:00',
+      jam_lembur: 0, upah: tm.upah_harian || 0, keterangan: 'Absensi massal'
+    };
+    const r = await api('saveAttendance', data);
+    if (r && r.success) success++;
+  }
+  toast('Absensi massal berhasil untuk ' + success + ' pekerja', 'success');
+  loadAttendance();
+}
+
+async function printAttendance() {
+  const pid = val('attProject');
+  const tgl = val('attDate');
+  if (!pid) { toast('Pilih proyek', 'error'); return; }
+  const project = currentProjects.find(p => p.id === pid);
+  const res = await api('getAttendance', { projectId: pid, tanggal: tgl });
+  const list = (res && res.data) || [];
+  const totalUpah = list.reduce((s, a) => s + (Number(a.upah) || 0), 0);
+  const win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>Absensi</title>' +
+    '<style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:8px}th{background:#1e40af;color:#fff}</style></head><body>' +
+    '<h2>LAPORAN ABSENSI HARIAN</h2>' +
+    '<p><b>' + esc(settingsCache.company_name || '') + '</b></p>' +
+    '<p>Proyek: <b>' + esc(project ? project.nama : '') + '</b><br>Tanggal: ' + esc(tgl) + '</p>' +
+    '<table><thead><tr><th>Nama</th><th>Jabatan</th><th>Status</th><th>Masuk</th><th>Keluar</th><th>Lembur</th><th>Upah</th></tr></thead><tbody>' +
+    list.map(a => '<tr><td>' + esc(a.nama_worker || '-') + '</td><td>' + esc(a.jabatan_worker || '-') + '</td><td>' + esc(a.status) + '</td><td>' + esc(a.jam_masuk || '-') + '</td><td>' + esc(a.jam_keluar || '-') + '</td><td>' + (a.jam_lembur || 0) + '</td><td>' + fmtRp(a.upah) + '</td></tr>').join('') +
+    '<tr style="background:#eee;font-weight:700"><td colspan="6" style="text-align:right">TOTAL UPAH</td><td>' + fmtRp(totalUpah) + '</td></tr></tbody></table>' +
+    '<p style="margin-top:30px;font-size:11px">Dicetak: ' + new Date().toLocaleString('id-ID') + '</p>' +
+    '<script>window.onload=function(){window.print()}<\/script></body></html>');
+  win.document.close();
 }
 
 // ==================================================================
@@ -1277,7 +1644,7 @@ async function saveDocument() {
 }
 
 // ==================================================================
-// USERS (ADMIN ONLY)
+// USERS
 // ==================================================================
 async function loadUsers() {
   const t = document.getElementById('usersTable');
@@ -1347,7 +1714,6 @@ function openUserModal(data) {
 function editUser(id) {
   const u = usersCache.find(x => x.id === id);
   if (u) openUserModal(u);
-  else toast('User tidak ditemukan', 'error');
 }
 
 async function saveUser(id) {
@@ -1377,7 +1743,7 @@ async function delUser(id) {
 }
 
 // ==================================================================
-// PERMISSIONS (RBAC UI)
+// PERMISSIONS
 // ==================================================================
 async function openPermissionsModal() {
   if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
@@ -1419,7 +1785,7 @@ async function openPermissionsModal() {
 async function savePermissionsFromModal() {
   if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
   const roles = ['manager', 'supervisor', 'viewer'];
-  const modules = ['projects','wbs','budget','finance','reports','changes','resources','qc','hse','documents','evm'];
+  const modules = ['projects','wbs','budget','finance','reports','changes','resources','qc','hse','documents','evm','teams','workers','attendance'];
   const permissions = {};
   roles.forEach(role => {
     permissions[role] = {};
@@ -1467,7 +1833,7 @@ async function saveSettings() {
 }
 
 // ==================================================================
-// SYSTEM SETTINGS (SEED / RESET / BACKUP / RESTORE)
+// SYSTEM SETTINGS
 // ==================================================================
 async function loadSystemPage() {
   if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
@@ -1480,14 +1846,14 @@ async function loadSystemPage() {
   document.getElementById('systemStats').innerHTML =
     '<div class="stat-card blue"><div class="label">Proyek</div><div class="value">' + (d.totalProjects || 0) + '</div></div>' +
     '<div class="stat-card green"><div class="label">User Terdaftar</div><div class="value">' + userCount + '</div></div>' +
-    '<div class="stat-card orange"><div class="label">Total Pemasukan</div><div class="value">' + fmtRp(d.totalIncome) + '</div></div>' +
+    '<div class="stat-card orange"><div class="label">Pekerja Aktif</div><div class="value">' + (d.totalWorkers || 0) + '</div></div>' +
     '<div class="stat-card red"><div class="label">Total Pengeluaran</div><div class="value">' + fmtRp(d.totalExpense) + '</div></div>' +
     '<div class="stat-card blue"><div class="label">Laporan Harian</div><div class="value">' + (d.totalReports || 0) + '</div></div>';
 }
 
 async function doSeedData() {
   if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
-  if (!confirm('Tambahkan data contoh ke aplikasi?\n\nAkan ditambahkan: 2 proyek, 16 WBS, 12 RAB, 12 transaksi, 7 laporan, 3 CO, 4 QC, 4 HSE, 11 resource, 7 dokumen.\n\nData lama TIDAK dihapus.')) return;
+  if (!confirm('Tambahkan data contoh ke aplikasi?\n\nAkan ditambahkan: 2 proyek, WBS, RAB, transaksi, laporan, CO, QC, HSE, resource, dokumen, 10 pekerja, 11 tim, 35 absensi.\n\nData lama TIDAK dihapus.')) return;
   const res = await api('seedDemoData', { adminId: currentUser.id });
   if (res && res.success) {
     toast(res.message || 'Data contoh ditambahkan', 'success');
@@ -1538,7 +1904,7 @@ async function doRestore() {
 
 async function doReset() {
   if (currentUser.role !== 'admin') { toast('Akses ditolak', 'error'); return; }
-  if (!confirm('⚠️ PERINGATAN ⚠️\n\nSemua data proyek, WBS, RAB, transaksi, laporan, CO, QC, HSE, resource, dokumen akan DIHAPUS PERMANEN.\n\nUser & pengaturan perusahaan tetap dipertahankan.\n\nLanjutkan?')) return;
+  if (!confirm('⚠️ PERINGATAN ⚠️\n\nSemua data proyek, WBS, RAB, transaksi, laporan, CO, QC, HSE, resource, dokumen, pekerja, tim, absensi akan DIHAPUS PERMANEN.\n\nUser & pengaturan perusahaan tetap dipertahankan.\n\nLanjutkan?')) return;
   if (!confirm('Yakin 100%? Tindakan ini TIDAK DAPAT DIBATALKAN.')) return;
   const res = await api('resetDatabase', { adminId: currentUser.id });
   if (res && res.success) {
